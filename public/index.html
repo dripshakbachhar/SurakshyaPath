@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SurakshyaPath · सुरक्षापथ — Predictive Community Policing</title>
+  <meta name="description" content="Community-driven predictive policing for Nepali municipalities. Report anonymously, map risk, patrol smarter." />
+
+  <!-- Map + charts libraries (CDN, no API keys needed) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- ======================= HEADER ======================= -->
+  <header>
+    <div class="brand">
+      <div class="logo">🛡️</div>
+      <div>
+        <h1>SurakshyaPath <span class="np">सुरक्षापथ</span></h1>
+        <p>Community-driven predictive policing for Nepali municipalities</p>
+      </div>
+    </div>
+    <nav id="tabs">
+      <button class="tab active" data-tab="report">📝 Report</button>
+      <button class="tab" data-tab="risk">🔥 Risk Map</button>
+      <button class="tab" data-tab="patrol">🚔 Patrol &amp; Resources</button>
+      <button class="tab" data-tab="analytics">📊 Analytics</button>
+    </nav>
+  </header>
+
+  <!-- ======================= STATS BAR ======================= -->
+  <section class="stats-bar">
+    <div class="stat"><span id="stat-total" class="num">—</span><label>Reports (30 days)</label></div>
+    <div class="stat"><span id="stat-zones" class="num">—</span><label>Active zones</label></div>
+    <div class="stat"><span id="stat-critical" class="num">—</span><label>High-risk zones</label></div>
+    <div class="stat"><span id="stat-night" class="num">—</span><label>% at night (8pm–4am)</label></div>
+  </section>
+
+  <!-- ======================= MAIN LAYOUT ======================= -->
+  <main class="layout">
+    <div id="map"></div>
+
+    <aside id="panel">
+      <!-- ---------- TAB 1: Anonymous reporting ---------- -->
+      <section id="panel-report" class="panel active">
+        <h2>Report anonymously</h2>
+        <p class="muted">No name. No login. No phone number. Your report helps the whole community — <strong>click the map</strong> to pin the location.</p>
+        <div id="picked-spot" class="picked muted">📍 No location picked yet — click anywhere on the map</div>
+        <form id="report-form">
+          <label>What happened?</label>
+          <select id="f-type" required>
+            <option value="theft">💼 Theft / Pickpocketing (चोरी)</option>
+            <option value="suspicious">🕵️ Suspicious Activity (संदिग्ध गतिविधि)</option>
+            <option value="harassment">🆘 Harassment (उत्पीडन)</option>
+            <option value="infrastructure">⚠️ Infrastructure Issue (पूर्वाधार)</option>
+          </select>
+          <label>When?</label>
+          <select id="f-when">
+            <option value="now">Just now</option>
+            <option value="today">Earlier today</option>
+            <option value="week">Within the past week</option>
+          </select>
+          <label>Details (optional)</label>
+          <textarea id="f-note" maxlength="280" rows="3" placeholder="e.g. Street light broken near the chowk, area is fully dark after 8pm"></textarea>
+          <button type="submit" class="btn primary">Submit anonymous report</button>
+        </form>
+        <div class="privacy-card">🔒 <strong>Privacy by design:</strong> SurakshyaPath never asks who you are. Reports are stored without any identity.</div>
+      </section>
+
+      <!-- ---------- TAB 2: Risk zones ---------- -->
+      <section id="panel-risk" class="panel">
+        <h2>Dynamic risk zones</h2>
+        <p class="muted">Risk = incident <strong>frequency × severity × recency</strong>, recomputed live as reports arrive.</p>
+        <div class="legend">
+          <span><i class="dot low"></i>Low</span><span><i class="dot moderate"></i>Moderate</span>
+          <span><i class="dot high"></i>High</span><span><i class="dot critical"></i>Critical</span>
+        </div>
+        <div class="check"><input type="checkbox" id="toggle-heat" checked /> <label for="toggle-heat">Heatmap layer</label></div>
+        <div class="check"><input type="checkbox" id="toggle-markers" checked /> <label for="toggle-markers">Incident markers</label></div>
+        <ul id="zone-list" class="zone-list"></ul>
+      </section>
+
+      <!-- ---------- TAB 3: Patrol & resources ---------- -->
+      <section id="panel-patrol" class="panel">
+        <h2>Patrol planner</h2>
+        <p class="muted">Optimal route through the highest-risk zones from your station (nearest-neighbour optimisation).</p>
+        <label>Station</label>
+        <select id="p-station"></select>
+        <label>Patrol stops</label>
+        <select id="p-stops">
+          <option value="3">Top 3 zones</option>
+          <option value="5" selected>Top 5 zones</option>
+          <option value="7">Top 7 zones</option>
+        </select>
+        <label>Officers on duty</label>
+        <input type="number" id="p-officers" min="2" max="40" value="12" />
+        <button id="p-generate" class="btn primary">Generate patrol plan</button>
+        <div id="route-card" class="route-card hidden"></div>
+        <div id="alloc-card" class="alloc-card hidden"></div>
+      </section>
+
+      <!-- ---------- TAB 4: Analytics ---------- -->
+      <section id="panel-analytics" class="panel">
+        <h2>Timing &amp; frequency analysis</h2>
+        <p class="muted">When and what the municipality should plan for.</p>
+        <div class="chart-box"><h3>Incidents by type</h3><canvas id="chart-type"></canvas></div>
+        <div class="chart-box"><h3>Hour of day <span class="hint">(peak risk window)</span></h3><canvas id="chart-hour"></canvas></div>
+        <div class="chart-box"><h3>Last 14 days</h3><canvas id="chart-trend"></canvas></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer>
+    SurakshyaPath · Hackathon MVP · Anonymous reporting → risk zones → smart patrol → safer streets
+  </footer>
+
+  <div id="toast" class="toast"></div>
+  <script src="js/app.js"></script>
+</body>
+</html>
