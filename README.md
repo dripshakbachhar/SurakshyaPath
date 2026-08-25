@@ -11,7 +11,7 @@ station resources** — turning scattered citizen signals into smarter, data-bac
 > vanilla JS, zero build step, zero API keys.
 
 ---
-
+     
 ## ✨ Features (all live in the demo)
 
 | # | Feature | Where to see it |
