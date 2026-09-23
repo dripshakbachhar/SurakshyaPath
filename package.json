@@ -10,7 +10,8 @@
     "research-experiments": "node experiments/run-experiments.js",
     "patrol-experiments": "node experiments/run-patrol-experiments.js",
     "allocation-experiments": "node experiments/run-allocation-experiments.js",
-    "validate": "node scripts/validate.js"
+    "validate": "node scripts/validate.js",
+    "robustness-experiments": "node experiments/run-robustness-experiments.js"
   },
   "engines": {
     "node": ">=18"
