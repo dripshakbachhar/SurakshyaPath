@@ -185,99 +185,123 @@ function renderZoneList() {
 
 /* --------------------------------- charts -------------------------------- */
 
-const charts = {};
-
 function drawCharts(a) {
-  const boxes = {
-    type: $('#chart-type').parentElement,
-    hour: $('#chart-hour').parentElement,
-    trend: $('#chart-trend').parentElement,
-  };
-
-  Object.values(boxes).forEach((box) => {
-    box.querySelectorAll('.chart-fallback').forEach((el) => el.remove());
-  });
-
-  if (!a || !a.byType || !Array.isArray(a.byHour) || !Array.isArray(a.byDay)) {
-    return showChartMessage(boxes.type, 'Analytics data is unavailable.');
-  }
-
-  if (typeof Chart === 'undefined') {
-    return showChartMessage(boxes.type, 'Chart library did not load. Reload the page to try again.');
-  }
-
-  try {
-    const ticks = { color: '#8ea0bf', font: { size: 10 } };
-    const grid = { color: 'rgba(255,255,255,.07)' };
-    const mk = (id, cfg) => {
-      if (charts[id]) charts[id].destroy();
-      charts[id] = new Chart($(id), cfg);
-    };
-
-    mk('#chart-type', {
-      type: 'doughnut',
-      data: {
-        labels: Object.keys(a.byType).map((t) => TYPE_META[t]?.label || t),
-        datasets: [{
-          data: Object.values(a.byType),
-          backgroundColor: Object.keys(a.byType).map((t) => TYPE_META[t]?.color || '#64748b'),
-          borderWidth: 0,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } } } },
-        cutout: '62%',
-      },
-    });
-
-    mk('#chart-hour', {
-      type: 'bar',
-      data: {
-        labels: [...Array(24)].map((_, h) => h),
-        datasets: [{ data: a.byHour, backgroundColor: a.byHour.map((v, h) => (h >= 20 || h < 4 ? '#ef4444' : '#3b82f6')) }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { ticks, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } },
-      },
-    });
-
-    mk('#chart-trend', {
-      type: 'line',
-      data: {
-        labels: a.byDay.map((d, i) => (i === a.byDay.length - 1 ? 'today' : `d-${a.byDay.length - 1 - i}`)),
-        datasets: [{
-          data: a.byDay.map((d) => d.count),
-          borderColor: '#f5a623',
-          backgroundColor: 'rgba(245,166,35,.15)',
-          fill: true,
-          tension: .35,
-          pointRadius: 2,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { x: { ticks: { color: '#8ea0bf', font: { size: 9 } }, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } },
-      },
-    });
-  } catch (error) {
-    console.error('Analytics chart error:', error);
-    showChartMessage(boxes.type, `Analytics chart error: ${error.message}`);
-  }
+  const canvases = ['chart-type', 'chart-hour', 'chart-trend'].map((id) => document.getElementById(id));
+  if (!a || !a.byType || !Array.isArray(a.byHour) || !Array.isArray(a.byDay)) return;
+  drawTypeChart(canvases[0], a.byType);
+  drawHourChart(canvases[1], a.byHour);
+  drawTrendChart(canvases[2], a.byDay);
 }
 
-function showChartMessage(box, message) {
-  const el = document.createElement('div');
-  el.className = 'chart-fallback';
-  el.textContent = message;
-  el.style.cssText = 'padding:24px 8px;text-align:center;color:#8ea0bf;font-size:12px;';
-  box.appendChild(el);
+function prepareCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const width = Math.max(260, canvas.clientWidth || canvas.parentElement.clientWidth || 340);
+  const height = 170;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  return { ctx, width, height };
+}
+
+function drawTypeChart(canvas, values) {
+  const { ctx, width, height } = prepareCanvas(canvas);
+  const entries = Object.entries(values).filter(([, v]) => Number(v) > 0);
+  const total = entries.reduce((s, [, v]) => s + Number(v), 0) || 1;
+  let angle = -Math.PI / 2;
+  const cx = width / 2, cy = 72, radius = 48;
+  entries.forEach(([type, value]) => {
+    const next = angle + (Number(value) / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, angle, next);
+    ctx.closePath();
+    ctx.fillStyle = TYPE_META[type]?.color || '#64748b';
+    ctx.fill();
+    angle = next;
+  });
+  ctx.beginPath();
+  ctx.arc(cx, cy, 29, 0, Math.PI * 2);
+  ctx.fillStyle = '#0e1626';
+  ctx.fill();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e7edf7';
+  ctx.font = '700 15px Segoe UI';
+  ctx.fillText(total, cx, cy + 5);
+  ctx.font = '10px Segoe UI';
+  ctx.fillStyle = '#8ea0bf';
+  ctx.fillText('reports', cx, cy + 20);
+
+  let x = 12, y = 148;
+  entries.forEach(([type, value]) => {
+    const label = TYPE_META[type]?.label || type;
+    ctx.fillStyle = TYPE_META[type]?.color || '#64748b';
+    ctx.fillRect(x, y - 9, 8, 8);
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '10px Segoe UI';
+    ctx.textAlign = 'left';
+    ctx.fillText(label + ': ' + value, x + 12, y);
+    x += Math.min(155, 30 + ctx.measureText(label + ': ' + value).width);
+    if (x > width - 100) { x = 12; y += 15; }
+  });
+}
+
+function drawHourChart(canvas, values) {
+  const { ctx, width, height } = prepareCanvas(canvas);
+  const max = Math.max(...values.map(Number), 1);
+  const left = 28, right = 8, top = 10, bottom = 28;
+  const chartW = width - left - right, chartH = height - top - bottom;
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.fillStyle = '#8ea0bf';
+  ctx.font = '9px Segoe UI';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < 24; i++) {
+    const x = left + (i + .5) * chartW / 24;
+    const h = Number(values[i] || 0) / max * chartH;
+    ctx.fillStyle = i >= 20 || i < 4 ? '#ef4444' : '#3b82f6';
+    ctx.fillRect(x - 3, top + chartH - h, 6, h);
+    if (i % 3 === 0) {
+      ctx.fillStyle = '#8ea0bf';
+      ctx.fillText(i, x, height - 9);
+    }
+  }
+  ctx.beginPath();
+  ctx.moveTo(left, top + chartH + .5);
+  ctx.lineTo(width - right, top + chartH + .5);
+  ctx.stroke();
+}
+
+function drawTrendChart(canvas, values) {
+  const { ctx, width, height } = prepareCanvas(canvas);
+  const nums = values.map((d) => Number(d.count) || 0);
+  const max = Math.max(...nums, 1);
+  const left = 24, right = 10, top = 12, bottom = 25;
+  const chartW = width - left - right, chartH = height - top - bottom;
+  const points = nums.map((v, i) => ({
+    x: left + (nums.length === 1 ? chartW / 2 : i * chartW / (nums.length - 1)),
+    y: top + chartH - (v / max) * chartH,
+  }));
+  ctx.strokeStyle = '#f5a623';
+  ctx.fillStyle = 'rgba(245,166,35,.15)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+  ctx.stroke();
+  ctx.lineTo(points[points.length - 1].x, top + chartH);
+  ctx.lineTo(points[0].x, top + chartH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#f5a623';
+  points.forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill(); });
+  ctx.fillStyle = '#8ea0bf';
+  ctx.font = '9px Segoe UI';
+  ctx.textAlign = 'left';
+  ctx.fillText('older', left, height - 8);
+  ctx.textAlign = 'right';
+  ctx.fillText('today', width - right, height - 8);
 }
 
 /* ------------------------------ interactions ----------------------------- */
