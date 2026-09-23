@@ -641,11 +641,26 @@ app.get(
       ).length;
 
     const byType = {};
+    const byHour = Array(24).fill(0);
+    const byDay = Array.from({ length: 30 }, (_, index) => ({
+      day: index + 1,
+      count: 0,
+    }));
 
     for (const incident of incidents) {
       byType[incident.type] =
-        (byType[incident.type] || 0) +
-        1;
+        (byType[incident.type] || 0) + 1;
+
+      const date = new Date(incident.ts);
+      byHour[date.getHours()]++;
+
+      const ageDays = Math.floor(
+        (now - incident.ts) / DAY_MS
+      );
+
+      if (ageDays >= 0 && ageDays < 30) {
+        byDay[29 - ageDays].count++;
+      }
     }
 
     res.json({
@@ -654,6 +669,8 @@ app.get(
       last7d,
       last30d,
       byType,
+      byHour,
+      byDay,
     });
   }
 );
