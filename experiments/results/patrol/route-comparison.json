@@ -9,28 +9,42 @@
   "stopCount": 5,
   "models": {
     "frequency-only": {
-      "baselineOrder": [
-        "Patan",
+      "priorityZones": [
+        "Kalimati",
+        "Kirtipur",
+        "Balaju",
+        "Bouddha",
+        "Koteshwor"
+      ],
+      "nearestNeighbourOrder": [
+        "Kalimati",
+        "Kirtipur",
+        "Balaju",
+        "Bouddha",
+        "Koteshwor"
+      ],
+      "optimizedOrder": [
         "Koteshwor",
         "Bouddha",
         "Balaju",
+        "Kalimati",
         "Kirtipur"
       ],
-      "optimizedOrder": [
-        "Balaju",
-        "Kirtipur",
-        "Patan",
-        "Koteshwor",
-        "Bouddha"
-      ],
-      "baselineKm": 24.2,
-      "optimizedKm": 22.49,
-      "savingsKm": 1.71,
-      "savingsPercent": 7.07,
+      "nearestNeighbourKm": 23.62,
+      "optimizedKm": 22.31,
+      "savingsKm": 1.3,
+      "savingsPercent": 5.51,
       "changedOrder": true
     },
     "severity-only": {
-      "baselineOrder": [
+      "priorityZones": [
+        "Thamel",
+        "Chabahil",
+        "Bouddha",
+        "Koteshwor",
+        "Kirtipur"
+      ],
+      "nearestNeighbourOrder": [
         "Thamel",
         "Chabahil",
         "Bouddha",
@@ -44,54 +58,69 @@
         "Koteshwor",
         "Kirtipur"
       ],
-      "baselineKm": 18.02,
-      "optimizedKm": 18.02,
+      "nearestNeighbourKm": 18.12,
+      "optimizedKm": 18.12,
       "savingsKm": 0,
       "savingsPercent": 0,
       "changedOrder": false
     },
     "frequency-severity": {
-      "baselineOrder": [
-        "Patan",
+      "priorityZones": [
+        "Kalimati",
+        "Kirtipur",
+        "Balaju",
+        "Bouddha",
+        "Koteshwor"
+      ],
+      "nearestNeighbourOrder": [
+        "Kalimati",
+        "Kirtipur",
+        "Balaju",
+        "Bouddha",
+        "Koteshwor"
+      ],
+      "optimizedOrder": [
         "Koteshwor",
         "Bouddha",
         "Balaju",
+        "Kalimati",
         "Kirtipur"
       ],
-      "optimizedOrder": [
-        "Balaju",
-        "Kirtipur",
-        "Patan",
-        "Koteshwor",
-        "Bouddha"
-      ],
-      "baselineKm": 24.2,
-      "optimizedKm": 22.49,
-      "savingsKm": 1.71,
-      "savingsPercent": 7.07,
+      "nearestNeighbourKm": 23.62,
+      "optimizedKm": 22.31,
+      "savingsKm": 1.3,
+      "savingsPercent": 5.51,
       "changedOrder": true
     },
     "current-severity-recency": {
-      "baselineOrder": [
-        "Patan",
+      "priorityZones": [
+        "Kalimati",
+        "Kirtipur",
+        "Balaju",
+        "Bouddha",
+        "Koteshwor"
+      ],
+      "nearestNeighbourOrder": [
+        "Kalimati",
+        "Kirtipur",
+        "Balaju",
+        "Bouddha",
+        "Koteshwor"
+      ],
+      "optimizedOrder": [
         "Koteshwor",
         "Bouddha",
         "Balaju",
+        "Kalimati",
         "Kirtipur"
       ],
-      "optimizedOrder": [
-        "Balaju",
-        "Kirtipur",
-        "Patan",
-        "Koteshwor",
-        "Bouddha"
-      ],
-      "baselineKm": 24.2,
-      "optimizedKm": 22.49,
-      "savingsKm": 1.71,
-      "savingsPercent": 7.07,
+      "nearestNeighbourKm": 23.62,
+      "optimizedKm": 22.31,
+      "savingsKm": 1.3,
+      "savingsPercent": 5.51,
       "changedOrder": true
     }
   },
-  "note": "Static outputs generated from the committed deterministic experiment logic. Distances are great-circle estimates, not road-network travel distances."
+  "comparison": "For each risk model, select its five highest-priority zones, generate the nearest-neighbour route, then measure changes from 2-opt optimization.",
+  "note": "Synthetic experiment only. Distances use great-circle distance between configured zone/station coordinates; this is not a road-network travel estimate. Results describe routing changes under the specified procedure and do not establish model superiority."
 }

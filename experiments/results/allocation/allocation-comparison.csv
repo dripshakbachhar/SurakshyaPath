@@ -1,0 +1,121 @@
+model,officers,zone,normalized_risk,assigned_officers,ideal_share
+frequency-only,6,Thamel,4.8387,0,0.0804
+frequency-only,6,Kalimati,29.7235,1,0.4939
+frequency-only,6,New Baneshwor,4.6083,0,0.0766
+frequency-only,6,Chabahil,8.9862,0,0.1493
+frequency-only,6,Koteshwor,83.1797,1,1.3823
+frequency-only,6,Balaju,33.4101,1,0.5552
+frequency-only,6,Patan,26.9585,0,0.448
+frequency-only,6,Gongabu,10.1382,0,0.1685
+frequency-only,6,Kirtipur,59.2166,1,0.984
+frequency-only,6,Bouddha,100,2,1.6618
+frequency-only,12,Thamel,4.8387,0,0.1608
+frequency-only,12,Kalimati,29.7235,1,0.9879
+frequency-only,12,New Baneshwor,4.6083,0,0.1532
+frequency-only,12,Chabahil,8.9862,0,0.2987
+frequency-only,12,Koteshwor,83.1797,3,2.7645
+frequency-only,12,Balaju,33.4101,1,1.1104
+frequency-only,12,Patan,26.9585,1,0.896
+frequency-only,12,Gongabu,10.1382,1,0.3369
+frequency-only,12,Kirtipur,59.2166,2,1.9681
+frequency-only,12,Bouddha,100,3,3.3235
+frequency-only,20,Thamel,4.8387,0,0.268
+frequency-only,20,Kalimati,29.7235,2,1.6465
+frequency-only,20,New Baneshwor,4.6083,0,0.2553
+frequency-only,20,Chabahil,8.9862,0,0.4978
+frequency-only,20,Koteshwor,83.1797,5,4.6075
+frequency-only,20,Balaju,33.4101,2,1.8507
+frequency-only,20,Patan,26.9585,1,1.4933
+frequency-only,20,Gongabu,10.1382,1,0.5616
+frequency-only,20,Kirtipur,59.2166,3,3.2802
+frequency-only,20,Bouddha,100,6,5.5392
+severity-only,6,Thamel,100,1,0.637
+severity-only,6,Kalimati,93.6047,1,0.5963
+severity-only,6,New Baneshwor,89.25,0,0.5686
+severity-only,6,Chabahil,96.9231,1,0.6174
+severity-only,6,Koteshwor,95.5471,1,0.6087
+severity-only,6,Balaju,91.9655,0,0.5859
+severity-only,6,Patan,91.0897,0,0.5803
+severity-only,6,Gongabu,93.0682,0,0.5929
+severity-only,6,Kirtipur,95.8074,1,0.6103
+severity-only,6,Bouddha,94.5968,1,0.6026
+severity-only,12,Thamel,100,2,1.2741
+severity-only,12,Kalimati,93.6047,1,1.1926
+severity-only,12,New Baneshwor,89.25,1,1.1371
+severity-only,12,Chabahil,96.9231,2,1.2349
+severity-only,12,Koteshwor,95.5471,1,1.2174
+severity-only,12,Balaju,91.9655,1,1.1717
+severity-only,12,Patan,91.0897,1,1.1606
+severity-only,12,Gongabu,93.0682,1,1.1858
+severity-only,12,Kirtipur,95.8074,1,1.2207
+severity-only,12,Bouddha,94.5968,1,1.2052
+severity-only,20,Thamel,100,2,2.1235
+severity-only,20,Kalimati,93.6047,2,1.9877
+severity-only,20,New Baneshwor,89.25,2,1.8952
+severity-only,20,Chabahil,96.9231,2,2.0581
+severity-only,20,Koteshwor,95.5471,2,2.0289
+severity-only,20,Balaju,91.9655,2,1.9529
+severity-only,20,Patan,91.0897,2,1.9343
+severity-only,20,Gongabu,93.0682,2,1.9763
+severity-only,20,Kirtipur,95.8074,2,2.0344
+severity-only,20,Bouddha,94.5968,2,2.0087
+frequency-severity,6,Thamel,5.1151,0,0.0851
+frequency-severity,6,Kalimati,29.4118,1,0.4895
+frequency-severity,6,New Baneshwor,4.3478,0,0.0724
+frequency-severity,6,Chabahil,9.2072,0,0.1532
+frequency-severity,6,Koteshwor,84.0153,1,1.3984
+frequency-severity,6,Balaju,32.4808,1,0.5406
+frequency-severity,6,Patan,25.9591,0,0.4321
+frequency-severity,6,Gongabu,9.9744,0,0.166
+frequency-severity,6,Kirtipur,59.9744,1,0.9982
+frequency-severity,6,Bouddha,100,2,1.6644
+frequency-severity,12,Thamel,5.1151,0,0.1703
+frequency-severity,12,Kalimati,29.4118,1,0.9791
+frequency-severity,12,New Baneshwor,4.3478,0,0.1447
+frequency-severity,12,Chabahil,9.2072,0,0.3065
+frequency-severity,12,Koteshwor,84.0153,3,2.7967
+frequency-severity,12,Balaju,32.4808,1,1.0812
+frequency-severity,12,Patan,25.9591,1,0.8641
+frequency-severity,12,Gongabu,9.9744,1,0.332
+frequency-severity,12,Kirtipur,59.9744,2,1.9965
+frequency-severity,12,Bouddha,100,3,3.3288
+frequency-severity,20,Thamel,5.1151,0,0.2838
+frequency-severity,20,Kalimati,29.4118,2,1.6318
+frequency-severity,20,New Baneshwor,4.3478,0,0.2412
+frequency-severity,20,Chabahil,9.2072,0,0.5108
+frequency-severity,20,Koteshwor,84.0153,5,4.6612
+frequency-severity,20,Balaju,32.4808,2,1.8021
+frequency-severity,20,Patan,25.9591,1,1.4402
+frequency-severity,20,Gongabu,9.9744,1,0.5534
+frequency-severity,20,Kirtipur,59.9744,3,3.3274
+frequency-severity,20,Bouddha,100,6,5.5481
+current-severity-recency,6,Thamel,6.2457,0,0.1025
+current-severity-recency,6,Kalimati,31.2812,1,0.5134
+current-severity-recency,6,New Baneshwor,4.9624,0,0.0814
+current-severity-recency,6,Chabahil,10.3838,0,0.1704
+current-severity-recency,6,Koteshwor,83.1269,1,1.3642
+current-severity-recency,6,Balaju,32.6904,1,0.5365
+current-severity-recency,6,Patan,25.4822,0,0.4182
+current-severity-recency,6,Gongabu,10.7939,0,0.1771
+current-severity-recency,6,Kirtipur,60.6376,1,0.9951
+current-severity-recency,6,Bouddha,100,2,1.6411
+current-severity-recency,12,Thamel,6.2457,0,0.205
+current-severity-recency,12,Kalimati,31.2812,1,1.0267
+current-severity-recency,12,New Baneshwor,4.9624,0,0.1629
+current-severity-recency,12,Chabahil,10.3838,0,0.3408
+current-severity-recency,12,Koteshwor,83.1269,3,2.7284
+current-severity-recency,12,Balaju,32.6904,1,1.073
+current-severity-recency,12,Patan,25.4822,1,0.8364
+current-severity-recency,12,Gongabu,10.7939,1,0.3543
+current-severity-recency,12,Kirtipur,60.6376,2,1.9903
+current-severity-recency,12,Bouddha,100,3,3.2822
+current-severity-recency,20,Thamel,6.2457,0,0.3417
+current-severity-recency,20,Kalimati,31.2812,2,1.7112
+current-severity-recency,20,New Baneshwor,4.9624,0,0.2715
+current-severity-recency,20,Chabahil,10.3838,1,0.568
+current-severity-recency,20,Koteshwor,83.1269,5,4.5474
+current-severity-recency,20,Balaju,32.6904,2,1.7883
+current-severity-recency,20,Patan,25.4822,1,1.394
+current-severity-recency,20,Gongabu,10.7939,1,0.5905
+current-severity-recency,20,Kirtipur,60.6376,3,3.3171
+current-severity-recency,20,Bouddha,100,5,5.4704

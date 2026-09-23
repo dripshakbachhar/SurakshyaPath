@@ -1,0 +1,164 @@
+{
+  "dataset": "deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+  "officerCounts": [
+    6,
+    12,
+    20
+  ],
+  "method": "computeAllocation: largest-remainder proportional allocation using normalized risk scores",
+  "models": {
+    "frequency-only": {
+      "6": {
+        "Thamel": 0,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 1,
+        "Balaju": 1,
+        "Patan": 0,
+        "Gongabu": 0,
+        "Kirtipur": 1,
+        "Bouddha": 2
+      },
+      "12": {
+        "Thamel": 0,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 3,
+        "Balaju": 1,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 2,
+        "Bouddha": 3
+      },
+      "20": {
+        "Thamel": 0,
+        "Kalimati": 2,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 5,
+        "Balaju": 2,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 3,
+        "Bouddha": 6
+      }
+    },
+    "severity-only": {
+      "6": {
+        "Thamel": 1,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 1,
+        "Koteshwor": 1,
+        "Balaju": 0,
+        "Patan": 0,
+        "Gongabu": 0,
+        "Kirtipur": 1,
+        "Bouddha": 1
+      },
+      "12": {
+        "Thamel": 2,
+        "Kalimati": 1,
+        "New Baneshwor": 1,
+        "Chabahil": 2,
+        "Koteshwor": 1,
+        "Balaju": 1,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 1,
+        "Bouddha": 1
+      },
+      "20": {
+        "Thamel": 2,
+        "Kalimati": 2,
+        "New Baneshwor": 2,
+        "Chabahil": 2,
+        "Koteshwor": 2,
+        "Balaju": 2,
+        "Patan": 2,
+        "Gongabu": 2,
+        "Kirtipur": 2,
+        "Bouddha": 2
+      }
+    },
+    "frequency-severity": {
+      "6": {
+        "Thamel": 0,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 1,
+        "Balaju": 1,
+        "Patan": 0,
+        "Gongabu": 0,
+        "Kirtipur": 1,
+        "Bouddha": 2
+      },
+      "12": {
+        "Thamel": 0,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 3,
+        "Balaju": 1,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 2,
+        "Bouddha": 3
+      },
+      "20": {
+        "Thamel": 0,
+        "Kalimati": 2,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 5,
+        "Balaju": 2,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 3,
+        "Bouddha": 6
+      }
+    },
+    "current-severity-recency": {
+      "6": {
+        "Thamel": 0,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 1,
+        "Balaju": 1,
+        "Patan": 0,
+        "Gongabu": 0,
+        "Kirtipur": 1,
+        "Bouddha": 2
+      },
+      "12": {
+        "Thamel": 0,
+        "Kalimati": 1,
+        "New Baneshwor": 0,
+        "Chabahil": 0,
+        "Koteshwor": 3,
+        "Balaju": 1,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 2,
+        "Bouddha": 3
+      },
+      "20": {
+        "Thamel": 0,
+        "Kalimati": 2,
+        "New Baneshwor": 0,
+        "Chabahil": 1,
+        "Koteshwor": 5,
+        "Balaju": 2,
+        "Patan": 1,
+        "Gongabu": 1,
+        "Kirtipur": 3,
+        "Bouddha": 5
+      }
+    }
+  },
+  "note": "Synthetic experiment only. Officer allocations are algorithm outputs, not real staffing recommendations."
+}
