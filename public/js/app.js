@@ -187,7 +187,7 @@ function drawCharts(a) {
 
   mk('#chart-trend', {
     type: 'line',
-    data: { labels: a.byDay.map((d) => (d.day === 13 ? 'today' : `d-${13 - d.day}`)),
+    data: { labels: a.byDay.map((d, i) => (i === a.byDay.length - 1 ? 'today' : `d-${a.byDay.length - 1 - i}`)),
       datasets: [{ data: a.byDay.map((d) => d.count), borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,.15)', fill: true, tension: .35, pointRadius: 2 }] },
     options: { plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#8ea0bf', font: { size: 9 } }, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } } },
