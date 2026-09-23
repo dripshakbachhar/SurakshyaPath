@@ -48,23 +48,8 @@ const incidents = parseCsv(fs.readFileSync(input, "utf8")).map(r => ({
   zone: nearestZone(Number(r.latitude), Number(r.longitude))
 }));
 
-const grouped = Object.fromEntries(zones.map(z => [z[0], []]));
-for (const incident of incidents) grouped[incident.zone].push(incident);
-
-const frequency = {};
-const severity = {};
-const frequencySeverity = {};
-const current = {};
-
-for (const [zone, records] of Object.entries(grouped)) {
-  frequency[zone] = records.length;
-  severity[zone] = records.length ? records.reduce((s, r) => s + r.severity, 0) / records.length : 0;
-  frequencySeverity[zone] = records.reduce((s, r) => s + r.severity, 0);
-  current[zone] = records.reduce((s, r) => {
-    const decay = Math.max(0.15, 1 - r.ageDays / 30);
-    return s + r.severity * decay;
-  }, 0);
-}
+const frequency = Object.fromEntries(zones.map(z => [z[0], 0]));
+for (const incident of incidents) frequency[incident.zone]++;
 
 const { scoreModels } = require("../algorithms/research-models");
 
@@ -83,24 +68,26 @@ for (const [name, scores] of Object.entries(models)) {
 
 fs.writeFileSync(
   path.join(outputDir, "README.md"),
-  `# Risk-model experiment results
-
-Generated from the deterministic 1,567-record synthetic dataset.
-
-Models:
-- frequency-only
-- severity-only
-- frequency-severity
-- current-severity-recency
-
-These outputs measure sensitivity of the algorithm on synthetic data. They are not real-world crime predictions.
-
-Run again with:
-
-```bash
-npm run research-experiments
-```
-`
+  [
+    "# Risk-model experiment results",
+    "",
+    "Generated from the deterministic 1,567-record synthetic dataset.",
+    "",
+    "Models:",
+    "- frequency-only",
+    "- severity-only",
+    "- frequency-severity",
+    "- current-severity-recency",
+    "",
+    "These outputs measure sensitivity of the algorithm on synthetic data. They are not real-world crime predictions.",
+    "",
+    "Run again with:",
+    "",
+    "```bash",
+    "npm run research-experiments",
+    "```",
+    "",
+  ].join("\n")
 );
 
 console.log(`Generated experiment outputs for ${incidents.length} synthetic records.`);
