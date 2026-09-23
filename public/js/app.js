@@ -202,7 +202,7 @@ async function refreshData(){
     state.zones=Array.isArray(dashboard.zones)?dashboard.zones:[];
     state.reports=Array.isArray(dashboard.incidents)?dashboard.incidents:[];
     state.analytics=dashboard.analytics||null;
-    renderOverview(); renderMapZones(); drawZones(); drawMarkers(); drawHeat(); renderZoneList();
+    renderOverview(); renderMapZones(); drawZones(); drawMarkers(); drawHeat(); renderZoneList(); updateStats();
     if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));
     $('#connection').textContent='LIVE'; $('#connection').className='connection live';
   }catch(err){
@@ -287,11 +287,11 @@ function drawRoute(route,alloc){
     const meta=await getJSON(`${API}/config`);
     state.types=meta.types||{};
     $('#p-station').innerHTML=(meta.stations||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
-    await refreshData(); updateStats(); setTab('overview');
+    await refreshData(); setTab('overview');
     useMyLocation._available=!!navigator.geolocation;
-    setInterval(async()=>{await refreshData();updateStats();},60000);
+    setInterval(refreshData,60000);
     window.addEventListener('resize',()=>{map.invalidateSize();if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));});
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshData();updateStats();}});
+    document.addEventListener('visibilitychange',async()=>{if(!document.hidden) await refreshData();});
     $('#picked-spot').addEventListener('dblclick',useMyLocation);
   }catch(err){toast(err.message||'Application failed to initialise.',false);}
 })();
