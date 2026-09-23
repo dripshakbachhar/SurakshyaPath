@@ -20,6 +20,9 @@ How does model-driven zone prioritization affect patrol-route order and total ro
 ### RQ4 — Reproducibility
 Can the complete experimental pipeline reproduce identical results when the dataset, parameters, and software are unchanged?
 
+### RQ5 — Robustness across synthetic scenarios
+Do the observed model-dependent patterns remain similar when the deterministic synthetic generator is rerun with several predefined seeds?
+
 ## 3. Hypotheses
 
 **H1:** Different risk-scoring models will produce different relative zone scores and/or prioritizations on the same incident dataset.
@@ -30,6 +33,8 @@ Can the complete experimental pipeline reproduce identical results when the data
 
 **H4:** Identical inputs, parameters, and software will produce identical experimental outputs across repeated executions.
 
+**H5:** The main descriptive patterns will remain reasonably stable across multiple deterministic synthetic seeds.
+
 ## 4. Dataset
 
 The research dataset contains **1,567 synthetic spatial incident records**.
@@ -37,7 +42,8 @@ The research dataset contains **1,567 synthetic spatial incident records**.
 The records are generated deterministically from:
 
 - Record count: 1,567
-- Random seed: 208304
+- Canonical random seed: 208304
+- Robustness seeds: 208304, 208305, 208306, 208307, 208308
 - Latitude bounds: 27.60–27.78
 - Longitude bounds: 85.20–85.50
 - Incident categories: theft, suspicious, harassment, infrastructure
@@ -146,7 +152,22 @@ This is a within-dataset computational comparison: the risk-scoring method is ch
 
 The experiment therefore measures how model choice changes downstream outputs; it does not establish that one model is universally superior.
 
-## 10. Reproducibility procedure
+## 10. Multi-seed robustness experiment
+
+A robustness experiment reruns the same synthetic-generation mechanism with five predefined seeds: 208304 through 208308. Each seed produces 1,567 records using the same category proportions, spatial bounds, severity definitions, canonical zones, risk models, 12-officer allocation budget, and 5-stop patrol setting.
+
+For each seed and model, the experiment records:
+
+- top-ranked zone,
+- mean absolute rank shift relative to the frequency-only reference,
+- number of zones whose 12-officer allocation differs from the frequency-only reference,
+- patrol-route distance.
+
+The results are stored under `experiments/results/robustness/`.
+
+These seed variations are **synthetic scenario replications**, not independent real-world observations. They are intended to test algorithmic sensitivity and robustness, not to justify population-level statistical inference or claims about actual crime patterns. Replication is useful for examining stability and potential moderators in empirical software-engineering research. citeturn0search0
+
+## 11. Reproducibility procedure
 
 The experiment should be reproducible from the repository using the documented npm scripts.
 
@@ -156,6 +177,7 @@ Current experiment commands:
 npm.cmd run research-experiments
 npm.cmd run patrol-experiments
 npm.cmd run allocation-experiments
+npm.cmd run robustness-experiments
 npm.cmd run validate
 ```
 
@@ -169,7 +191,7 @@ The validation script checks:
 - patrol-route validity,
 - risk-model determinism and incident counting.
 
-## 11. Expected outputs
+## 12. Expected outputs
 
 Research outputs are stored under:
 
@@ -183,7 +205,7 @@ Current result groups include:
 
 CSV files are intended for tabular analysis; JSON files preserve machine-readable summaries.
 
-## 12. Analysis plan
+## 13. Analysis plan
 
 The first analysis is descriptive.
 
@@ -200,7 +222,7 @@ Do not interpret a numerical difference as proof of superiority without an appro
 
 Where useful, report absolute differences and percentage differences rather than only raw values.
 
-## 13. Threats to validity
+## 14. Threats to validity
 
 ### Synthetic spatial data
 
@@ -222,7 +244,7 @@ Results depend on the selected number of officers, patrol stops, recency window,
 
 The risk models encode different assumptions about what constitutes priority. Their outputs should therefore be interpreted as model-dependent analytical results rather than objective measurements of risk.
 
-## 14. Reproduction checklist
+## 15. Reproduction checklist
 
 A reproduction should:
 
@@ -235,7 +257,7 @@ A reproduction should:
 7. Compare generated outputs with the stored experiment results.
 8. Record any differences in software version, parameters, dataset, or configuration.
 
-## 15. Implementation map
+## 16. Implementation map
 
 | Research component | Repository location |
 |---|---|
