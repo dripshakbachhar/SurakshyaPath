@@ -1,11 +1,12 @@
 {
   "name": "surakshyapath",
   "version": "1.0.0",
-  "description": "SurakshyaPath — community-driven predictive policing for Nepali municipalities (hackathon MVP)",
+  "description": "SurakshyaPath — experimental data-driven incident analysis, risk modelling, patrol routing, and resource allocation.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "research-experiments": "node experiments/run-experiments.js"
   },
   "engines": {
     "node": ">=18"
