@@ -11,7 +11,8 @@
     "patrol-experiments": "node experiments/run-patrol-experiments.js",
     "allocation-experiments": "node experiments/run-allocation-experiments.js",
     "validate": "node scripts/validate.js",
-    "robustness-experiments": "node experiments/run-robustness-experiments.js"
+    "robustness-experiments": "node experiments/run-robustness-experiments.js",
+    "figures": "node experiments/generate-figures.js"
   },
   "engines": {
     "node": ">=18"
