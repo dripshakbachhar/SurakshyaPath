@@ -34,7 +34,16 @@ const {
 
 const app = express();
 
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '32kb' }));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'geolocation=(self)');
+  if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ============================================================================
@@ -312,6 +321,15 @@ save(incidents);
 // ZONE HELPERS
 // ============================================================================
 
+const reportWindow = new Map();
+function allowReport(ip) {
+  const now = Date.now();
+  const recent = (reportWindow.get(ip) || []).filter(t => now - t < 60000);
+  if (recent.length >= 12) { reportWindow.set(ip, recent); return false; }
+  recent.push(now); reportWindow.set(ip, recent); return true;
+}
+function validCoordinate(n, min, max) { return typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max; }
+
 function nearestZone(lat, lng) {
   let best = null;
   let bestDistance = Infinity;
@@ -447,13 +465,12 @@ app.post(
     } = req.body;
 
     if (
-      typeof lat !== 'number' ||
-      typeof lng !== 'number' ||
+      !validCoordinate(lat, 27.55, 27.85) ||
+      !validCoordinate(lng, 85.15, 85.55) ||
       !TYPES[type]
     ) {
       return res.status(400).json({
-        error:
-          'Invalid incident data.',
+        error: 'Invalid location or incident type.',
       });
     }
 
@@ -470,16 +487,11 @@ app.post(
 
       ts: Date.now(),
 
-      reporter:
-        reporter || 'Anonymous',
+      reporter: 'Anonymous',
+      note: typeof note === 'string' ? note.trim().slice(0, 280) || sampleNotes[type][0] : sampleNotes[type][0],
 
-      note:
-        note ||
-        sampleNotes[type][0],
-
-      lat,
-
-      lng,
+      lat: Number(lat.toFixed(5)),
+      lng: Number(lng.toFixed(5)),
     };
 
     incidents.push(incident);
