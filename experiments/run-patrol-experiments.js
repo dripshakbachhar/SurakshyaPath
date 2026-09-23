@@ -57,9 +57,13 @@ for(const [model,scores] of Object.entries(models)){
   const baseline=computePatrol({station,zones:modelZones,stopCount:STOP_COUNT});
   const optimized=twoOptOpenRoute(baseline.stops);
   const baselineOrder=baseline.stops.map(s=>s.name),optimizedOrder=optimized.stops.map(s=>s.name);
-  const savingsKm=baseline.totalKm-optimized.totalKm,changedOrder=baselineOrder.some((n,i)=>n!==optimizedOrder[i]);
-  routeDetails[model]={baselineOrder,optimizedOrder,baselineKm:round(baseline.totalKm),optimizedKm:round(optimized.totalKm),savingsKm:round(savingsKm),savingsPercent:round(savingsKm/baseline.totalKm*100),changedOrder};
-  rows.push([model,baselineOrder.join(" > "),optimizedOrder.join(" > "),round(baseline.totalKm),round(optimized.totalKm),round(savingsKm),round(savingsKm/baseline.totalKm*100),changedOrder?"yes":"no"]);
+  const baselineKm=routeDistance(baseline.stops);
+  const optimizedKm=optimized.totalKm;
+  const savingsKm=baselineKm-optimizedKm;
+  const changedOrder=baselineOrder.some((n,i)=>n!==optimizedOrder[i]);
+  if (optimizedKm > baselineKm + 1e-9) throw new Error(`2-opt increased route distance for ${model}`);
+  routeDetails[model]={baselineOrder,optimizedOrder,baselineKm:round(baselineKm),optimizedKm:round(optimizedKm),savingsKm:round(savingsKm),savingsPercent:round(savingsKm/baselineKm*100),changedOrder};
+  rows.push([model,baselineOrder.join(" > "),optimizedOrder.join(" > "),round(baselineKm),round(optimizedKm),round(savingsKm),round(savingsKm/baselineKm*100),changedOrder?"yes":"no"]);
 }
 fs.mkdirSync(resultsDir,{recursive:true});
 const csv=[
