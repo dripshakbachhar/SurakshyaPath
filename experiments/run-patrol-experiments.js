@@ -1,0 +1,100 @@
+const fs=require("fs");
+const path=require("path");
+const {computePatrol,haversine}=require("../algorithms/routing");
+
+const dataDir=path.join(__dirname,"..","data");
+const resultsDir=path.join(__dirname,"results","patrol");
+const input=path.join(dataDir,"synthetic_incidents.csv");
+if(!fs.existsSync(input)) require("../data/generate-synthetic");
+
+const zones=[
+  {name:"Thamel",lat:27.715,lng:85.312},{name:"Kalimati",lat:27.700,lng:85.283},
+  {name:"New Baneshwor",lat:27.691,lng:85.342},{name:"Chabahil",lat:27.718,lng:85.347},
+  {name:"Koteshwor",lat:27.678,lng:85.347},{name:"Balaju",lat:27.735,lng:85.291},
+  {name:"Patan",lat:27.676,lng:85.325},{name:"Gongabu",lat:27.735,lng:85.312},
+  {name:"Kirtipur",lat:27.678,lng:85.277},{name:"Bouddha",lat:27.721,lng:85.362}
+];
+const station={id:"mpr-ratna-park",name:"MPR Ratna Park",lat:27.705,lng:85.315};
+const STOP_COUNT=5;
+
+function parseCsv(text){
+  const lines=text.trim().split(/\r?\n/),headers=lines.shift().split(",");
+  return lines.map(line=>{const values=line.split(",");return Object.fromEntries(headers.map((h,i)=>[h,values[i]]));});
+}
+function nearestZone(lat,lng){
+  let best=zones[0],bestD=Infinity;
+  for(const zone of zones){const d=Math.hypot(lat-zone.lat,lng-zone.lng);if(d<bestD){best=zone;bestD=d;}}
+  return best.name;
+}
+function normalize(scores){
+  const max=Math.max(...Object.values(scores),1);
+  return Object.fromEntries(Object.entries(scores).map(([z,v])=>[z,(v/max)*100]));
+}
+function scoreModels(incidents){
+  const grouped=Object.fromEntries(zones.map(z=>[z.name,[]]));
+  for(const incident of incidents) grouped[incident.zone].push(incident);
+  const frequency={},severity={},frequencySeverity={},current={};
+  for(const [zone,records] of Object.entries(grouped)){
+    frequency[zone]=records.length;
+    severity[zone]=records.length?records.reduce((s,r)=>s+r.severity,0)/records.length:0;
+    frequencySeverity[zone]=records.reduce((s,r)=>s+r.severity,0);
+    current[zone]=records.reduce((s,r)=>s+r.severity*Math.max(0.15,1-r.ageDays/30),0);
+  }
+  return {
+    "frequency-only":normalize(frequency),
+    "severity-only":normalize(severity),
+    "frequency-severity":normalize(frequencySeverity),
+    "current-severity-recency":normalize(current)
+  };
+}
+function orderZones(scores){
+  return Object.entries(scores).sort((a,b)=>b[1]-a[1])
+    .map(([name])=>zones.find(z=>z.name===name)).filter(Boolean);
+}
+function routeDistance(stops){
+  let current=station,total=0;
+  for(const stop of stops){total+=haversine(current,stop);current=stop;}
+  return total;
+}
+function twoOptOpenRoute(stops){
+  let best=[...stops],bestDistance=routeDistance(best),improved=true;
+  while(improved){
+    improved=false;
+    for(let i=0;i<best.length-1;i++){
+      for(let j=i+1;j<best.length;j++){
+        const candidate=[...best.slice(0,i),...best.slice(i,j+1).reverse(),...best.slice(j+1)];
+        const distance=routeDistance(candidate);
+        if(distance+1e-9<bestDistance){best=candidate;bestDistance=distance;improved=true;}
+      }
+    }
+  }
+  return {stops:best,totalKm:bestDistance};
+}
+const round=value=>Number(value.toFixed(2));
+const incidents=parseCsv(fs.readFileSync(input,"utf8")).map(r=>({
+  severity:Number(r.severity),ageDays:Number(r.age_days),
+  zone:nearestZone(Number(r.latitude),Number(r.longitude))
+}));
+const models=scoreModels(incidents),rows=[],routeDetails={};
+for(const [model,scores] of Object.entries(models)){
+  const ranked=orderZones(scores);
+  const modelZones=ranked.map((zone,index)=>({...zone,count:1,score:scores[zone.name],rank:index+1}));
+  const baseline=computePatrol({station,zones:modelZones,stopCount:STOP_COUNT});
+  const optimized=twoOptOpenRoute(baseline.stops);
+  const baselineOrder=baseline.stops.map(s=>s.name),optimizedOrder=optimized.stops.map(s=>s.name);
+  const savingsKm=baseline.totalKm-optimized.totalKm,changedOrder=baselineOrder.some((n,i)=>n!==optimizedOrder[i]);
+  routeDetails[model]={baselineOrder,optimizedOrder,baselineKm:round(baseline.totalKm),optimizedKm:round(optimized.totalKm),savingsKm:round(savingsKm),savingsPercent:round(savingsKm/baseline.totalKm*100),changedOrder};
+  rows.push([model,baselineOrder.join(" > "),optimizedOrder.join(" > "),round(baseline.totalKm),round(optimized.totalKm),round(savingsKm),round(savingsKm/baseline.totalKm*100),changedOrder?"yes":"no"]);
+}
+fs.mkdirSync(resultsDir,{recursive:true});
+const csv=[
+  ["model","nearest_neighbour_route","two_opt_route","nearest_neighbour_km","two_opt_km","distance_saved_km","distance_saved_percent","route_order_changed"].join(","),
+  ...rows.map(row=>row.map(value=>{const text=String(value);return text.includes(",")?JSON.stringify(text):text;}).join(","))
+].join("\n")+"\n";
+fs.writeFileSync(path.join(resultsDir,"route-comparison.csv"),csv);
+fs.writeFileSync(path.join(resultsDir,"route-comparison.json"),JSON.stringify({
+  dataset:"deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",station,stopCount:STOP_COUNT,models:routeDetails,
+  note:"Synthetic experiment only. Distances use great-circle distance between configured zone/station coordinates; this is not a road-network travel estimate."
+},null,2)+"\n");
+console.log(`Generated patrol-route comparisons for ${incidents.length} synthetic incidents.`);
+console.table(rows.map(r=>({model:r[0],baselineKm:r[3],optimizedKm:r[4],savedKm:r[5],savedPercent:r[6],orderChanged:r[7]})));
