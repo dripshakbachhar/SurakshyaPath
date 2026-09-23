@@ -330,6 +330,13 @@ function allowReport(ip) {
 }
 function validCoordinate(n, min, max) { return typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max; }
 
+function incidentTimestamp(when) {
+  const now = Date.now();
+  if (when === 'today') return now - 3 * 60 * 60 * 1000;
+  if (when === 'week') return now - 3 * DAY_MS;
+  return now;
+}
+
 function nearestZone(lat, lng) {
   let best = null;
   let bestDistance = Infinity;
@@ -358,8 +365,12 @@ function nearestZone(lat, lng) {
 // RISK MODEL
 // ============================================================================
 
+function snapshotNow() {
+  return Math.floor(Date.now() / 60000) * 60000;
+}
+
 function computeZones() {
-  const now = Date.now();
+  const now = snapshotNow();
   if (riskCache && now - riskCache.at < RISK_CACHE_MS) return riskCache.zones;
 
   const zones = computeZonesFromModel({
@@ -485,7 +496,7 @@ app.post(
 
       type,
 
-      ts: Date.now(),
+      ts: incidentTimestamp(req.body.when),
 
       reporter: 'Anonymous',
       note: typeof note === 'string' ? note.trim().slice(0, 280) || sampleNotes[type][0] : sampleNotes[type][0],
@@ -528,10 +539,10 @@ app.get(
       req.query.station ||
       STATIONS[0].id;
 
-    const stopCount =
-      Number(
-        req.query.stops || 5
-      );
+    const stopCount = Math.max(
+      1,
+      Math.min(10, Number.isFinite(Number(req.query.stops)) ? Number(req.query.stops) : 5)
+    );
 
     res.json(
       computePatrol(
@@ -549,10 +560,10 @@ app.get(
 app.get(
   '/api/allocation',
   (req, res) => {
-    const officers =
-      Number(
-        req.query.officers || 12
-      );
+    const officers = Math.max(
+      2,
+      Math.min(40, Number.isFinite(Number(req.query.officers)) ? Number(req.query.officers) : 12)
+    );
 
     res.json(
       computeAllocation(
@@ -598,7 +609,7 @@ app.get('/api/analytics', (req, res) => {
 
 app.get('/api/dashboard', (req, res) => {
   const snapshot = incidents.slice();
-  const now = Date.now();
+  const now = snapshotNow();
 
   const zones = computeZonesFromModel({
     zones: ZONES,
