@@ -17,7 +17,7 @@ const TYPE_META = {
 const BAND_COLOR = { low: '#22c55e', moderate: '#eab308', high: '#f97316', critical: '#ef4444' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const state = { reports: [], zones: [], types: {}, analytics: null, pick: null, tab: 'report' };
+const state = { reports: [], zones: [], types: {}, analytics: null, pick: null, tab: 'report', loading: false };
 
 /* --------------------------------- helpers ------------------------------- */
 
@@ -33,7 +33,12 @@ function toast(msg, ok = true) {
   t._timer = setTimeout(() => (t.className = 'toast'), 3200);
 }
 
-const getJSON = async (url) => (await fetch(url)).json();
+async function getJSON(url, options = {}) {
+  const res = await fetch(url, { headers: { Accept: 'application/json', ...(options.headers || {}) }, ...options });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
 const timeAgo = (ts) => {
   const h = Math.floor((Date.now() - ts) / 3600e3);
   return h < 1 ? 'just now' : h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
@@ -91,6 +96,9 @@ function useMyLocation() {
 /* ------------------------------ data rendering --------------------------- */
 
 async function refreshData() {
+  if (state.loading) return;
+  state.loading = true;
+  try {
   const dashboard = await getJSON(`${API}/dashboard`);
   const { zones, incidents, analytics } = dashboard;
   state.zones = zones; state.reports = incidents; state.analytics = analytics;
@@ -105,7 +113,16 @@ async function refreshData() {
   $('#stat-night').textContent = analytics.total ? Math.round((night / analytics.total) * 100) + '%' : '0%';
 
   drawZones(); drawMarkers(); drawHeat(); renderZoneList();
-  if (state.tab === 'analytics') drawCharts(analytics);
+  if (state.tab === 'analytics') requestAnimationFrame(() => drawCharts(analytics));
+  $('#connection').textContent = 'LIVE';
+  $('#connection').className = 'connection live';
+  } catch (err) {
+    $('#connection').textContent = 'OFFLINE';
+    $('#connection').className = 'connection offline';
+    toast(err.message || 'Could not load dashboard.', false);
+  } finally {
+    state.loading = false;
+  }
 }
 
 function renderMapZoneInfo() {
@@ -137,7 +154,8 @@ function drawZones() {
         direction: 'center',
         className: 'zone-label',
       })
-      .bindPopup(`<b>${esc(z.name)} (${esc(z.np)})</b><br>Risk score: <b style="color:${BAND_COLOR[z.band]}">${z.score}/100 · ${z.band}</b><br>${z.count} reports in 30 days${z.peakHour !== null ? `<br>Peak hour: <b>${z.peakHour}:00</b>` : ''}<br>Location: ${z.lat.toFixed(5)}, ${z.lng.toFixed(5)}`)
+      .bindPopup(`<b>${esc(z.name)} (${esc(z.np)})</b><br>Risk score: <b style="color:${BAND_COLOR[z.band]}">${z.score}/100 · ${z.band}</b><br>${z.count} reports in 30 days${z.peakHour !== null ? `<br>Peak hour: <b>${z.peakHour}:00</b>` : ''}<br>Click the zone row for more detail.`)
+      .on('click', () => openZoneDetail(z))
       .addTo(layers.zones);
   }
 }
@@ -151,6 +169,7 @@ function drawMarkers() {
       radius: 5, color: '#0b1220', weight: 1, fillColor: m.color, fillOpacity: 0.95,
     })
       .bindPopup(`<b>${m.icon} ${m.label}</b><br>Location: ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}<br>${esc(r.note || 'No description')}<br><span class="muted">${timeAgo(r.ts)}</span>`)
+      .on('click', () => openReportDetail(r))
       .addTo(layers.markers);
   }
 }
@@ -183,6 +202,49 @@ function renderZoneList() {
   });
 }
 
+function openZoneDetail(z) {
+  $('#detail-title').textContent = z.name;
+  $('#detail-subtitle').textContent = `${z.band.toUpperCase()} RISK · CURRENT SNAPSHOT`;
+  $('#detail-body').innerHTML = `
+    <div class="detail-grid">
+      <div><span>Risk score</span><b style="color:${BAND_COLOR[z.band]}">${z.score}/100</b></div>
+      <div><span>Reports · 30d</span><b>${z.count}</b></div>
+      <div><span>Last 24h</span><b>${z.last24h}</b></div>
+      <div><span>Peak hour</span><b>${z.peakHour === null ? '—' : String(z.peakHour).padStart(2,'0') + ':00'}</b></div>
+    </div>
+    <p class="detail-note">This is the live API snapshot used by the dashboard. Click “focus” to center the map on this zone.</p>
+    <button class="btn secondary" id="detail-focus">Focus on map</button>`;
+  $('#detail').classList.add('open');
+  $('#detail-focus').onclick = () => { map.flyTo([z.lat, z.lng], 14); closeDetail(); };
+}
+function openReportDetail(r) {
+  const m = TYPE_META[r.type] || { label: r.type, icon: '•' };
+  const zone = state.zones.find(z => z.id === r.zone);
+  $('#detail-title').textContent = m.label;
+  $('#detail-subtitle').textContent = `INCIDENT · ${timeAgo(r.ts)}`;
+  $('#detail-body').innerHTML = `
+    <div class="detail-grid">
+      <div><span>Zone</span><b>${esc(zone?.name || r.zone)}</b></div>
+      <div><span>Type</span><b>${esc(m.label)}</b></div>
+      <div><span>Latitude</span><b>${Number(r.lat).toFixed(5)}</b></div>
+      <div><span>Longitude</span><b>${Number(r.lng).toFixed(5)}</b></div>
+    </div>
+    <p class="detail-note"><strong>Report:</strong> ${esc(r.note || 'No description provided.')}</p>`;
+  $('#detail').classList.add('open');
+}
+function openAnalyticsDetail(title, html) {
+  $('#detail-title').textContent = title;
+  $('#detail-subtitle').textContent = 'ANALYTICS DETAIL';
+  $('#detail-body').innerHTML = html;
+  $('#detail').classList.add('open');
+}
+function closeDetail() { $('#detail').classList.remove('open'); }
+
+document.addEventListener('click', e => {
+  if (e.target.id === 'detail-close' || e.target.id === 'detail-backdrop') closeDetail();
+});
+window.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+
 /* --------------------------------- charts -------------------------------- */
 
 function drawCharts(a) {
@@ -208,6 +270,7 @@ function prepareCanvas(canvas) {
 }
 
 function drawTypeChart(canvas, values) {
+  canvas._hits = [];
   const { ctx, width, height } = prepareCanvas(canvas);
   const entries = Object.entries(values).filter(([, v]) => Number(v) > 0);
   const total = entries.reduce((s, [, v]) => s + Number(v), 0) || 1;
@@ -221,6 +284,7 @@ function drawTypeChart(canvas, values) {
     ctx.closePath();
     ctx.fillStyle = TYPE_META[type]?.color || '#64748b';
     ctx.fill();
+    canvas._hits.push({ type, start: angle, end: next, cx, cy, radius });
     angle = next;
   });
   ctx.beginPath();
@@ -250,6 +314,7 @@ function drawTypeChart(canvas, values) {
 }
 
 function drawHourChart(canvas, values) {
+  canvas._hits = [];
   const { ctx, width, height } = prepareCanvas(canvas);
   const max = Math.max(...values.map(Number), 1);
   const left = 28, right = 8, top = 10, bottom = 28;
@@ -262,6 +327,7 @@ function drawHourChart(canvas, values) {
     const x = left + (i + .5) * chartW / 24;
     const h = Number(values[i] || 0) / max * chartH;
     ctx.fillStyle = i >= 20 || i < 4 ? '#ef4444' : '#3b82f6';
+    canvas._hits.push({ hour: i, x1: x - 7, x2: x + 7, y1: top + chartH - h, y2: top + chartH });
     ctx.fillRect(x - 3, top + chartH - h, 6, h);
     if (i % 3 === 0) {
       ctx.fillStyle = '#8ea0bf';
@@ -275,6 +341,7 @@ function drawHourChart(canvas, values) {
 }
 
 function drawTrendChart(canvas, values) {
+  canvas._trendPoints = [];
   const { ctx, width, height } = prepareCanvas(canvas);
   const nums = values.map((d) => Number(d.count) || 0);
   const max = Math.max(...nums, 1);
@@ -302,7 +369,45 @@ function drawTrendChart(canvas, values) {
   ctx.fillText('older', left, height - 8);
   ctx.textAlign = 'right';
   ctx.fillText('today', width - right, height - 8);
+  canvas._trendPoints = points.map((p, i) => ({ x: p.x, data: values[i] }));
 }
+
+function chartPoint(canvas, event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * canvas.width / rect.width / (window.devicePixelRatio || 1),
+    y: (event.clientY - rect.top) * canvas.height / rect.height / (window.devicePixelRatio || 1),
+  };
+}
+function installChartInteractions() {
+  const type = $('#chart-type'), hour = $('#chart-hour'), trend = $('#chart-trend');
+  type.onclick = e => {
+    const p = chartPoint(type, e);
+    const hit = (type._hits || []).find(h => {
+      const a = (Math.atan2(p.y-h.cy, p.x-h.cx) + Math.PI*2) % (Math.PI*2);
+      const s = (h.start + Math.PI*2) % (Math.PI*2), n = (h.end + Math.PI*2) % (Math.PI*2);
+      return Math.hypot(p.x-h.cx, p.y-h.cy) <= h.radius && (s <= n ? a >= s && a <= n : a >= s || a <= n);
+    });
+    if (hit) {
+      const n = state.analytics.byType[hit.type] || 0;
+      openAnalyticsDetail(TYPE_META[hit.type]?.label || hit.type, `<div class="detail-stat"><b>${n}</b><span>records</span></div><p class="detail-note">Share of dashboard records: ${(n / state.analytics.total * 100).toFixed(1)}%.</p>`);
+    }
+  };
+  hour.onclick = e => {
+    const p = chartPoint(hour, e);
+    const hit = (hour._hits || []).find(h => p.x >= h.x1 && p.x <= h.x2 && p.y >= h.y1 && p.y <= h.y2);
+    if (hit) openAnalyticsDetail(`Hour ${String(hit.hour).padStart(2,'0')}:00`, `<div class="detail-stat"><b>${state.analytics.byHour[hit.hour] || 0}</b><span>records</span></div><p class="detail-note">${hit.hour >= 20 || hit.hour < 4 ? 'Inside the dashboard night window (20:00–04:00).' : 'Outside the dashboard night window.'}</p>`);
+  };
+  trend.onclick = e => {
+    const p = chartPoint(trend, e), pts = trend._trendPoints || [];
+    if (!pts.length) return;
+    const hit = pts.reduce((best, q, i) => Math.abs(q.x-p.x) < Math.abs(pts[best].x-p.x) ? i : best, 0);
+    const d = pts[hit].data;
+    openAnalyticsDetail(`Day ${d.day} of 30`, `<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p class="detail-note">Daily count in the rolling 30-day dashboard snapshot.</p>`);
+  };
+  [type,hour,trend].forEach(c => c.onmouseenter = () => c.style.cursor = 'pointer');
+}
+installChartInteractions();
 
 /* ------------------------------ interactions ----------------------------- */
 
@@ -349,7 +454,10 @@ $('#toggle-markers').onchange = (e) => (e.target.checked ? layers.markers.addTo(
 /* --------------------------- patrol & allocation ------------------------- */
 
 $('#p-generate').addEventListener('click', async () => {
-  const station = $('#p-station').value;
+  const button = $('#p-generate');
+  button.disabled = true; button.textContent = 'Generating…';
+  try {
+  const station = encodeURIComponent($('#p-station').value);
   const stops = $('#p-stops').value;
   const officers = Math.max(2, Math.min(40, +$('#p-officers').value || 12));
 
@@ -358,6 +466,8 @@ $('#p-generate').addEventListener('click', async () => {
     getJSON(`${API}/allocation?officers=${officers}`),
   ]);
   drawRoute(route, alloc);
+  } catch (err) { toast(err.message || 'Could not generate patrol plan.', false); }
+  finally { button.disabled = false; button.textContent = 'Generate patrol plan'; }
 });
 
 function drawRoute(route, alloc) {
@@ -411,5 +521,6 @@ function drawRoute(route, alloc) {
   $('#p-station').innerHTML = meta.stations
     .map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   await refreshData();
-  setInterval(refreshData, 60_000);   // keep the dashboard live
+  setInterval(refreshData, 60_000);
+  window.addEventListener('resize', () => { if (state.tab === 'analytics') requestAnimationFrame(() => drawCharts(state.analytics)); });
 })();
