@@ -88,7 +88,7 @@ function computeAllocation({
   return {
     officers,
 
-    zones: staffed.map(
+    zones: activeZones.map(
       (zone, index) => {
         const peak =
           zone.peakHour;
