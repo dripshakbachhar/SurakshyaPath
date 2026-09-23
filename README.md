@@ -60,27 +60,48 @@ These experiments ask how sensitive geographic prioritization is to the assumpti
 
 ## Experiments
 
-Run the reproducible risk-model comparison with:
+### Risk-model sensitivity
+
+Run:
 
 ```bash
-npm install
 npm run research-experiments
 ```
 
-Run the patrol-route experiment with:
+This compares the four scoring assumptions using the same deterministic synthetic dataset.
+
+### Patrol-route sensitivity
+
+Run:
 
 ```bash
 npm run patrol-experiments
 ```
 
-The patrol experiment:
+The patrol experiment selects the five highest-scoring zones under each model, runs the application's nearest-neighbour heuristic, and compares it with a simple 2-opt route-order improvement.
 
-1. selects the five highest-scoring zones under each risk model
-2. runs the application's nearest-neighbour patrol heuristic
-3. applies a simple 2-opt route-order improvement
-4. compares route order and great-circle distance
+In the current synthetic coordinate experiment, the severity-only model selects a different set of five zones. For the frequency-based/current models, 2-opt reduces the open-route estimate from about **24.20 km to 22.49 km**. These are algorithm-test results, not road-network travel distances or patrol recommendations.
 
-The current synthetic result shows that the severity-only model selects a different set of five zones from the other three models. For the frequency-based/current models, 2-opt reduces the open-route distance from about **24.20 km to 22.49 km** in this synthetic coordinate model. The severity-only route is unchanged at about **18.02 km**. These are algorithm-test results, not real travel distances or patrol recommendations.
+### Resource-allocation sensitivity
+
+Run:
+
+```bash
+npm run allocation-experiments
+```
+
+This reuses the production largest-remainder allocation algorithm and tests the four risk models at **6, 12, and 20 officers**.
+
+For the 12-officer scenario, the synthetic experiment produces:
+
+| Risk model | Example allocation pattern |
+|---|---|
+| Frequency-only | Bouddha 3, Koteshwor 3, Balaju 2, Kirtipur 2 |
+| Severity-only | Chabahil 2, Koteshwor 2, and 1 officer across several other zones |
+| Frequency × severity | Bouddha 3, Koteshwor 3, Balaju 2, Kirtipur 2 |
+| Severity × recency | Bouddha 3, Koteshwor 3, Kirtipur 2, plus smaller allocations including Gongabu |
+
+Compared with the current severity × recency model at 12 officers, the frequency-only and frequency × severity models change the integer allocation in **2 zones**, while the severity-only model changes it in **6 zones**. This illustrates how scoring assumptions can propagate into discrete resource decisions on the synthetic dataset.
 
 Results are written to `experiments/results/`.
 
@@ -122,7 +143,7 @@ The goal is not to build a black-box prediction system. It is to make the assump
 - [x] Baseline risk model
 - [x] Alternative risk-model experiments
 - [x] Patrol-route sensitivity experiment
-- [ ] Resource-allocation sensitivity experiment
+- [x] Resource-allocation sensitivity experiment
 - [ ] Final dashboard/experiment visualization
 - [ ] Portfolio-ready documentation and screenshots
 
@@ -132,6 +153,7 @@ The goal is not to build a black-box prediction system. It is to make the assump
 - The official police statistic is an aggregate count, not a geocoded incident dataset.
 - The current patrol planner uses a nearest-neighbour heuristic rather than an exact TSP solver.
 - The 2-opt experiment uses great-circle coordinate distance rather than a road network.
+- Resource allocations are mathematical outputs, not real staffing recommendations.
 - Risk scores depend on explicit assumptions about severity and recency.
 - Results from the synthetic dataset should not be interpreted as real-world crime predictions.
 
