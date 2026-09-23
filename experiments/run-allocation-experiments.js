@@ -19,27 +19,7 @@ function nearestZone(lat,lng){
   for(const zone of zones){const d=Math.hypot(lat-zone.lat,lng-zone.lng);if(d<bestD){best=zone;bestD=d;}}
   return best.name;
 }
-function normalize(scores){
-  const max=Math.max(...Object.values(scores),1);
-  return Object.fromEntries(Object.entries(scores).map(([z,v])=>[z,(v/max)*100]));
-}
-function scoreModels(incidents){
-  const grouped=Object.fromEntries(zones.map(z=>[z.name,[]]));
-  for(const incident of incidents) grouped[incident.zone].push(incident);
-  const frequency={},severity={},frequencySeverity={},current={};
-  for(const [zone,records] of Object.entries(grouped)){
-    frequency[zone]=records.length;
-    severity[zone]=records.length?records.reduce((s,r)=>s+r.severity,0)/records.length:0;
-    frequencySeverity[zone]=records.reduce((s,r)=>s+r.severity,0);
-    current[zone]=records.reduce((s,r)=>s+r.severity*Math.max(0.15,1-r.ageDays/30),0);
-  }
-  return {
-    "frequency-only":normalize(frequency),
-    "severity-only":normalize(severity),
-    "frequency-severity":normalize(frequencySeverity),
-    "current-severity-recency":normalize(current)
-  };
-}
+const { scoreModels } = require("../algorithms/research-models");
 function largestRemainder(scores,officers){
   const total=Object.values(scores).reduce((s,v)=>s+v,0)||1;
   const shares=Object.fromEntries(Object.entries(scores).map(([z,v])=>[z,v/total*officers]));
@@ -56,7 +36,7 @@ const incidents=parseCsv(fs.readFileSync(input,"utf8")).map(r=>({
   severity:Number(r.severity),ageDays:Number(r.age_days),
   zone:nearestZone(Number(r.latitude),Number(r.longitude))
 }));
-const models=scoreModels(incidents);
+const models=scoreModels(incidents,zones.map(z=>z.name));
 const rows=[],modelSummary={};
 for(const [model,scores] of Object.entries(models)){
   modelSummary[model]={};
