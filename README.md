@@ -1,83 +1,124 @@
 # 🛡️ SurakshyaPath · सुरक्षापथ
 
-**Community-driven predictive policing for Nepali municipalities.**
+**An experimental system for incident analysis, risk modelling, patrol routing, and resource allocation.**
 
-Citizens anonymously report thefts, suspicious activity, harassment, and infrastructure
-issues. The backend analyzes incident **frequency, severity, and timing** to map dynamic
-risk zones, automatically compute **optimal patrol routes**, and allocate **limited
-station resources** — turning scattered citizen signals into smarter, data-backed policing.
+SurakshyaPath started as a hackathon prototype for anonymous incident reporting and map-based risk visualization. It is now being developed as a small, reproducible engineering project for exploring how different risk-scoring assumptions affect geographic prioritization and downstream patrol/resource decisions.
 
-> **Hackathon MVP** — deliberately small and readable. One Express server, one page of
-> vanilla JS, zero build step, zero API keys.
+> **Important:** this project does not claim to predict crime or represent real incident-level police records. The current spatial dataset is synthetic. Official Nepal Police data is used only as an aggregate monthly reference.
 
----
-     
-## ✨ Features (all live in the demo)
-
-| # | Feature | Where to see it |
-|---|---------|-----------------|
-| 1 | **Anonymous incident reporting** — no name, no login, no phone. Location pinned by map click or GPS | `Report` tab |
-| 2 | **Dynamic risk-zone map** — heatmap + scored zones (frequency × severity × recency), recomputed live as reports arrive | `Risk Map` tab |
-| 3 | **Timing & frequency analytics** — incidents by type, hour-of-day peak windows, 14-day trend, night-share stat | `Analytics` tab |
-| 4 | **Optimal patrol route** — nearest-neighbour route through the top-risk zones from any station, with distance & ETA | `Patrol & Resources` tab |
-| 5 | **Officer resource allocation** — largest-remainder proportional split of on-duty officers across zones, each with its peak-risk patrol window | `Patrol & Resources` tab |
-
-## 🏗️ Architecture
+## What the project does
 
 ```
-Browser (public/)
-  index.html · css/style.css · js/app.js     ← Leaflet map + heatmap + Chart.js
-        │  fetch (relative URLs, same origin)
-        ▼
-Express server (server.js)                   ← REST API + static hosting
-  POST /api/reports      anonymous report (identity fields never accepted)
-  GET  /api/zones        risk score per zone  = Σ severity × recency-decay (0–100)
-  GET  /api/analytics    by-type / by-hour / 14-day trend / night share
-  GET  /api/patrol?station=&stops=   nearest-neighbour route + km + ETA
-  GET  /api/allocation?officers=     proportional officer split + peak windows
-        ▼
-data/incidents.json                          ← auto-seeded with ~97 realistic sample
-                                               incidents around Kathmandu (first run)
+Incident data
+     ↓
+Risk modelling
+     ↓
+Geographic prioritization
+     ↓
+Patrol routing
+     ↓
+Resource allocation
 ```
 
-**The risk model (explainable in one sentence):**
-`risk(zone) = Σ over last 30 days  severity(type) × max(0.15, 1 − age/30)`, normalized
-to 0–100 against the worst zone. Fresh + severe = high risk. No black box.
+The dashboard provides:
 
-## 🚀 Quick start
+- anonymous incident submission for local testing
+- a Leaflet-based incident and heatmap view
+- explainable risk scores based on severity and recency
+- nearest-neighbour patrol routing
+- proportional resource allocation using the largest-remainder method
+- basic timing and frequency analytics
+
+## Data
+
+The current project uses one month: **Shrawan 2083 B.S.**
+
+- **Official reference:** Nepal Police reports **1,567 registered cases for Kathmandu Valley** for the month.
+- **Spatial layer:** 1,567 synthetic incident records are used to exercise the algorithms geographically.
+- **Synthetic data is clearly labelled:** it is not a set of real police incident coordinates.
+
+See [`data/data_sources.md`](data/data_sources.md) for provenance and limitations.
+
+## Risk model
+
+The baseline model is intentionally explainable:
+
+```
+risk(zone) = Σ severity(type) × recency_decay(incident)
+```
+
+Recency decay decreases with age and has a minimum weight of 0.15 over the 30-day modelling window. Zone scores are normalized from 0–100 against the highest-risk zone.
+
+The project also includes controlled experiments comparing:
+
+1. current severity × recency model
+2. frequency-only scoring
+3. severity-only scoring
+4. frequency × severity
+
+These experiments ask how sensitive geographic prioritization is to the assumptions inside the scoring formula. They are **not** presented as evidence that one model is preferable for real-world policing.
+
+## Experiments
+
+Run the reproducible risk-model comparison with:
 
 ```bash
 npm install
-npm start          # → http://localhost:3000
+npm run research-experiments
 ```
 
-Requires Node ≥ 18. Nothing else — no database, no API keys, no build step.
-Delete `data/incidents.json` to re-seed fresh demo data.
+Results are written to `experiments/results/`.
 
-## 🎤 60-second judge demo script
+## Architecture
 
-1. **Report** — click the map near Thamel → pick *"Theft"* → submit. Toast confirms it
-   was logged anonymously; the stats bar ticks up instantly.
-2. **Risk Map** — show the heatmap and zone list; point at Thamel's red *critical* badge
-   and its peak hour.
-3. **Analytics** — highlight the hour-of-day chart: most bars are red → *63% of incidents
-   happen between 8pm–4am* → policing should too.
-4. **Patrol & Resources** — pick a station, set 12 officers, hit *Generate patrol plan*:
-   numbered route drawn on the map, total km/ETA, and an allocation table with per-zone
-   peak patrol windows.
-5. One-liner: **"One anonymous click from a citizen becomes a patrol stop tonight."**
+```
+Browser (public/)
+  index.html · css/style.css · js/app.js
+        │
+        ▼
+Express server (server.js)
+        │
+        ├── algorithms/risk.js
+        ├── algorithms/routing.js
+        ├── algorithms/allocation.js
+        └── data/
+```
 
-## 🧰 Tech stack
+## Quick start
 
-- **Backend:** Node.js + Express (~350 commented lines)
-- **Frontend:** Vanilla HTML/CSS/JS, Leaflet + leaflet.heat + Chart.js (CDN)
-- **Storage:** JSON file (swap for Postgres later — the API wouldn't change)
-- **Why this stack:** everything runs anywhere Node runs, judges can read 100% of the
-  code, and the demo never breaks because of a missing API key.
+Requires Node.js 18+.
 
-## 🗺️ Roadmap (post-MVP)
+```bash
+npm install
+npm start
+```
 
-- SMS/WhatsApp reporting for citizens without smartphones
-- Police-station login with verified escalation of reports
-- True TSP solver (2-opt / OR-tools) when zones grow
-- Nepali-language UI toggle
+Then open `http://localhost:3000`.
+
+## Why this project
+
+The goal is not to build a black-box prediction system. It is to make the assumptions visible, test alternative approaches against the same data, and see whether those choices change downstream decisions such as patrol routing and resource allocation.
+
+## Current status
+
+- [x] Working web application
+- [x] One-month Kathmandu Valley dataset integration
+- [x] Explicit synthetic-data separation
+- [x] Baseline risk model
+- [x] Alternative risk-model experiments
+- [ ] Patrol-route sensitivity experiment
+- [ ] Resource-allocation sensitivity experiment
+- [ ] Final dashboard/experiment visualization
+- [ ] Portfolio-ready documentation and screenshots
+
+## Limitations
+
+- The spatial incident layer is synthetic.
+- The official police statistic is an aggregate count, not a geocoded incident dataset.
+- The current patrol planner uses a nearest-neighbour heuristic rather than an exact TSP solver.
+- Risk scores depend on explicit assumptions about severity and recency.
+- Results from the synthetic dataset should not be interpreted as real-world crime predictions.
+
+## License
+
+MIT

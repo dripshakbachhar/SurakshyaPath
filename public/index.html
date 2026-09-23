@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SurakshyaPath · सुरक्षापथ — Predictive Community Policing</title>
-  <meta name="description" content="Community-driven predictive policing for Nepali municipalities. Report anonymously, map risk, patrol smarter." />
+  <title>SurakshyaPath · सुरक्षापथ — Data-Driven Incident Analysis</title>
+  <meta name="description" content="Experimental incident analysis, risk modelling, patrol routing, and resource allocation." />
 
   <!-- Map + charts libraries (CDN, no API keys needed) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -21,7 +21,7 @@
       <div class="logo">🛡️</div>
       <div>
         <h1>SurakshyaPath <span class="np">सुरक्षापथ</span></h1>
-        <p>Community-driven predictive policing for Nepali municipalities</p>
+        <p>Experimental incident analysis and resource planning</p>
       </div>
     </div>
     <nav id="tabs">
@@ -34,7 +34,7 @@
 
   <!-- ======================= STATS BAR ======================= -->
   <section class="stats-bar">
-    <div class="stat"><span id="stat-total" class="num">—</span><label>Reports (30 days)</label></div>
+    <div class="stat"><span id="stat-total" class="num">—</span><label>Research records</label></div>
     <div class="stat"><span id="stat-zones" class="num">—</span><label>Active zones</label></div>
     <div class="stat"><span id="stat-critical" class="num">—</span><label>High-risk zones</label></div>
     <div class="stat"><span id="stat-night" class="num">—</span><label>% at night (8pm–4am)</label></div>
@@ -74,7 +74,7 @@
       <!-- ---------- TAB 2: Risk zones ---------- -->
       <section id="panel-risk" class="panel">
         <h2>Dynamic risk zones</h2>
-        <p class="muted">Risk = incident <strong>frequency × severity × recency</strong>, recomputed live as reports arrive.</p>
+        <p class="muted">Baseline risk uses <strong>severity × recency</strong>. Spatial research records are synthetic and used for algorithm testing.</p>
         <div class="legend">
           <span><i class="dot low"></i>Low</span><span><i class="dot moderate"></i>Moderate</span>
           <span><i class="dot high"></i>High</span><span><i class="dot critical"></i>Critical</span>
@@ -115,7 +115,7 @@
   </main>
 
   <footer>
-    SurakshyaPath · Hackathon MVP · Anonymous reporting → risk zones → smart patrol → safer streets
+    SurakshyaPath · Experimental data-driven incident analysis · Synthetic spatial dataset for algorithm testing
   </footer>
 
   <div id="toast" class="toast"></div>
