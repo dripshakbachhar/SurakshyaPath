@@ -1,0 +1,97 @@
+{
+  "dataset": "deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+  "station": {
+    "id": "mpr-ratna-park",
+    "name": "MPR Ratna Park",
+    "lat": 27.705,
+    "lng": 85.315
+  },
+  "stopCount": 5,
+  "models": {
+    "frequency-only": {
+      "baselineOrder": [
+        "Patan",
+        "Koteshwor",
+        "Bouddha",
+        "Balaju",
+        "Kirtipur"
+      ],
+      "optimizedOrder": [
+        "Balaju",
+        "Kirtipur",
+        "Patan",
+        "Koteshwor",
+        "Bouddha"
+      ],
+      "baselineKm": 24.2,
+      "optimizedKm": 22.49,
+      "savingsKm": 1.71,
+      "savingsPercent": 7.07,
+      "changedOrder": true
+    },
+    "severity-only": {
+      "baselineOrder": [
+        "Thamel",
+        "Chabahil",
+        "Bouddha",
+        "Koteshwor",
+        "Kirtipur"
+      ],
+      "optimizedOrder": [
+        "Thamel",
+        "Chabahil",
+        "Bouddha",
+        "Koteshwor",
+        "Kirtipur"
+      ],
+      "baselineKm": 18.02,
+      "optimizedKm": 18.02,
+      "savingsKm": 0,
+      "savingsPercent": 0,
+      "changedOrder": false
+    },
+    "frequency-severity": {
+      "baselineOrder": [
+        "Patan",
+        "Koteshwor",
+        "Bouddha",
+        "Balaju",
+        "Kirtipur"
+      ],
+      "optimizedOrder": [
+        "Balaju",
+        "Kirtipur",
+        "Patan",
+        "Koteshwor",
+        "Bouddha"
+      ],
+      "baselineKm": 24.2,
+      "optimizedKm": 22.49,
+      "savingsKm": 1.71,
+      "savingsPercent": 7.07,
+      "changedOrder": true
+    },
+    "current-severity-recency": {
+      "baselineOrder": [
+        "Patan",
+        "Koteshwor",
+        "Bouddha",
+        "Balaju",
+        "Kirtipur"
+      ],
+      "optimizedOrder": [
+        "Balaju",
+        "Kirtipur",
+        "Patan",
+        "Koteshwor",
+        "Bouddha"
+      ],
+      "baselineKm": 24.2,
+      "optimizedKm": 22.49,
+      "savingsKm": 1.71,
+      "savingsPercent": 7.07,
+      "changedOrder": true
+    }
+  },
+  "note": "Static outputs generated from the committed deterministic experiment logic. Distances are great-circle estimates, not road-network travel distances."
+}

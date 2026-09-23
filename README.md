@@ -67,6 +67,21 @@ npm install
 npm run research-experiments
 ```
 
+Run the patrol-route experiment with:
+
+```bash
+npm run patrol-experiments
+```
+
+The patrol experiment:
+
+1. selects the five highest-scoring zones under each risk model
+2. runs the application's nearest-neighbour patrol heuristic
+3. applies a simple 2-opt route-order improvement
+4. compares route order and great-circle distance
+
+The current synthetic result shows that the severity-only model selects a different set of five zones from the other three models. For the frequency-based/current models, 2-opt reduces the open-route distance from about **24.20 km to 22.49 km** in this synthetic coordinate model. The severity-only route is unchanged at about **18.02 km**. These are algorithm-test results, not real travel distances or patrol recommendations.
+
 Results are written to `experiments/results/`.
 
 ## Architecture
@@ -106,7 +121,7 @@ The goal is not to build a black-box prediction system. It is to make the assump
 - [x] Explicit synthetic-data separation
 - [x] Baseline risk model
 - [x] Alternative risk-model experiments
-- [ ] Patrol-route sensitivity experiment
+- [x] Patrol-route sensitivity experiment
 - [ ] Resource-allocation sensitivity experiment
 - [ ] Final dashboard/experiment visualization
 - [ ] Portfolio-ready documentation and screenshots
@@ -116,6 +131,7 @@ The goal is not to build a black-box prediction system. It is to make the assump
 - The spatial incident layer is synthetic.
 - The official police statistic is an aggregate count, not a geocoded incident dataset.
 - The current patrol planner uses a nearest-neighbour heuristic rather than an exact TSP solver.
+- The 2-opt experiment uses great-circle coordinate distance rather than a road network.
 - Risk scores depend on explicit assumptions about severity and recency.
 - Results from the synthetic dataset should not be interpreted as real-world crime predictions.
 

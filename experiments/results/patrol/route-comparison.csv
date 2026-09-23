@@ -1,0 +1,5 @@
+model,nearest_neighbour_route,two_opt_route,nearest_neighbour_km,two_opt_km,distance_saved_km,distance_saved_percent,route_order_changed
+frequency-only,"Patan > Koteshwor > Bouddha > Balaju > Kirtipur","Balaju > Kirtipur > Patan > Koteshwor > Bouddha",24.20,22.49,1.71,7.07,yes
+severity-only,"Thamel > Chabahil > Bouddha > Koteshwor > Kirtipur","Thamel > Chabahil > Bouddha > Koteshwor > Kirtipur",18.02,18.02,0.00,0.00,no
+frequency-severity,"Patan > Koteshwor > Bouddha > Balaju > Kirtipur","Balaju > Kirtipur > Patan > Koteshwor > Bouddha",24.20,22.49,1.71,7.07,yes
+current-severity-recency,"Patan > Koteshwor > Bouddha > Balaju > Kirtipur","Balaju > Kirtipur > Patan > Koteshwor > Bouddha",24.20,22.49,1.71,7.07,yes
