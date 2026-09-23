@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "research-experiments": "node experiments/run-experiments.js"
+    "research-experiments": "node experiments/run-experiments.js",
+    "patrol-experiments": "node experiments/run-patrol-experiments.js"
   },
   "engines": {
     "node": ">=18"
