@@ -541,70 +541,61 @@ app.get(
 );
 
 // ============================================================================
-// API — ANALYTICS
+// ANALYTICS
 // ============================================================================
 
-app.get(
-  '/api/analytics',
-  (req, res) => {
-    const now = Date.now();
+function buildAnalytics(source, now = Date.now()) {
+  const last24h = source.filter((incident) => now - incident.ts < DAY_MS).length;
+  const last7d = source.filter((incident) => now - incident.ts < 7 * DAY_MS).length;
+  const last30d = source.filter((incident) => now - incident.ts < 30 * DAY_MS).length;
 
-    const last24h =
-      incidents.filter(
-        (incident) =>
-          now - incident.ts <
-          DAY_MS
-      ).length;
+  const byType = {};
+  const byHour = Array(24).fill(0);
+  const byDay = Array.from({ length: 30 }, (_, index) => ({ day: index + 1, count: 0 }));
 
-    const last7d =
-      incidents.filter(
-        (incident) =>
-          now - incident.ts <
-          7 * DAY_MS
-      ).length;
+  for (const incident of source) {
+    byType[incident.type] = (byType[incident.type] || 0) + 1;
 
-    const last30d =
-      incidents.filter(
-        (incident) =>
-          now - incident.ts <
-          30 * DAY_MS
-      ).length;
+    const date = new Date(incident.ts);
+    byHour[date.getHours()]++;
 
-    const byType = {};
-    const byHour = Array(24).fill(0);
-    const byDay = Array.from({ length: 30 }, (_, index) => ({
-      day: index + 1,
-      count: 0,
-    }));
-
-    for (const incident of incidents) {
-      byType[incident.type] =
-        (byType[incident.type] || 0) + 1;
-
-      const date = new Date(incident.ts);
-      byHour[date.getHours()]++;
-
-      const ageDays = Math.floor(
-        (now - incident.ts) / DAY_MS
-      );
-
-      if (ageDays >= 0 && ageDays < 30) {
-        byDay[29 - ageDays].count++;
-      }
-    }
-
-    res.json({
-      total: incidents.length,
-      last24h,
-      last7d,
-      last30d,
-      byType,
-      byHour,
-      byDay,
-    });
+    const ageDays = Math.floor((now - incident.ts) / DAY_MS);
+    if (ageDays >= 0 && ageDays < 30) byDay[29 - ageDays].count++;
   }
-);
 
+  return { total: source.length, last24h, last7d, last30d, byType, byHour, byDay };
+}
+
+app.get('/api/analytics', (req, res) => {
+  res.json(buildAnalytics(incidents));
+});
+
+// ============================================================================
+// API — DASHBOARD SNAPSHOT
+// ============================================================================
+
+app.get('/api/dashboard', (req, res) => {
+  const snapshot = incidents.slice();
+  const now = Date.now();
+
+  const zones = computeZonesFromModel({
+    zones: ZONES,
+    incidents: snapshot,
+    types: TYPES,
+    days: 30,
+    now,
+  });
+
+  res.json({
+    incidents: snapshot,
+    zones,
+    analytics: buildAnalytics(snapshot, now),
+  });
+});
+
+// ============================================================================
+// SERVER
+// ============================================================================
 // ============================================================================
 // SERVER
 // ============================================================================
