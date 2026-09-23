@@ -36,7 +36,7 @@ function barChart(title, subtitle, values, maxValue, suffix = "") {
   const left = 250, top = 130, barH = 55, gap = 18, chartW = 650;
   const body = values.map((value, i) => {
     const y = top + i * (barH + gap);
-    const w = maxValue ? Math.max(2, value / maxValue * chartW) : 2;
+    const w = maxValue ? Math.max(2, value.value / maxValue * chartW) : 2;
     return `<text x="235" y="${y + 36}" text-anchor="end" font-family="Arial" font-size="16">${value.label}</text>
       <rect x="${left}" y="${y}" width="${w}" height="${barH}" fill="#444"/>
       <text x="${left + w + 10}" y="${y + 36}" font-family="Arial" font-size="15">${value.value}${suffix}</text>`;
@@ -49,20 +49,6 @@ const canonicalScores = [
   ["severity-only", 100],
   ["frequency-severity", 100],
   ["current-severity-recency", 100]
-];
-
-const allocation = [
-  ["frequency-only", 0],
-  ["severity-only", 6],
-  ["frequency-severity", 0],
-  ["current-severity-recency", 0]
-];
-
-const patrol = [
-  ["frequency-only", 23.62],
-  ["severity-only", 18.12],
-  ["frequency-severity", 23.62],
-  ["current-severity-recency", 23.62]
 ];
 
 const rankValues = models.map(model => ({
@@ -109,23 +95,27 @@ fs.writeFileSync(path.join(outDir, "patrol-comparison.svg"), barChart(
   " km"
 ));
 
-fs.writeFileSync(path.join(outDir, "README.md"), "# Research figures
+const readme = [
+  "# Research figures",
+  "",
+  "Generated from the deterministic experiment outputs.",
+  "",
+  "## Figures",
+  "",
+  "- `risk-model-comparison.svg` — canonical normalized model scores.",
+  "- `allocation-comparison.svg` — aggregate allocation changes across robustness seeds.",
+  "- `robustness-comparison.svg` — mean absolute rank shift across robustness seeds.",
+  "- `patrol-comparison.svg` — mean patrol distance across robustness seeds.",
+  "",
+  "Generate with:",
+  "",
+  "```bash",
+  "npm.cmd run figures",
+  "```",
+  "",
+  "The figures are descriptive visualizations of the synthetic computational experiment. They do not establish real-world crime risk, operational effectiveness, or universal superiority of a model.",
+  ""
+].join("\n");
 
-Generated from the deterministic experiment outputs.
-
-## Figures
-
-- `risk-model-comparison.svg` — canonical normalized model scores.
-- `allocation-comparison.svg` — aggregate allocation changes across robustness seeds.
-- `robustness-comparison.svg` — mean absolute rank shift across robustness seeds.
-- `patrol-comparison.svg` — mean patrol distance across robustness seeds.
-
-Generate with:
-
-```bash
-npm.cmd run figures
-```
-
-The figures are descriptive visualizations of the synthetic computational experiment. They do not establish real-world crime risk, operational effectiveness, or universal superiority of a model.
-`);
+fs.writeFileSync(path.join(outDir, "README.md"), readme);
 console.log("Generated 4 research figures.");
