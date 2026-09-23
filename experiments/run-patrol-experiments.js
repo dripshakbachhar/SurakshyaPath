@@ -7,13 +7,8 @@ const resultsDir=path.join(__dirname,"results","patrol");
 const input=path.join(dataDir,"synthetic_incidents.csv");
 if(!fs.existsSync(input)) require("../data/generate-synthetic");
 
-const zones=[
-  {name:"Thamel",lat:27.715,lng:85.312},{name:"Kalimati",lat:27.700,lng:85.283},
-  {name:"New Baneshwor",lat:27.691,lng:85.342},{name:"Chabahil",lat:27.718,lng:85.347},
-  {name:"Koteshwor",lat:27.678,lng:85.347},{name:"Balaju",lat:27.735,lng:85.291},
-  {name:"Patan",lat:27.676,lng:85.325},{name:"Gongabu",lat:27.735,lng:85.312},
-  {name:"Kirtipur",lat:27.678,lng:85.277},{name:"Bouddha",lat:27.721,lng:85.362}
-];
+const { ZONES } = require("../config/zones");
+const zones=ZONES.map(({name,lat,lng})=>({name,lat,lng}));
 const station={id:"mpr-ratna-park",name:"MPR Ratna Park",lat:27.705,lng:85.315};
 const STOP_COUNT=5;
 
