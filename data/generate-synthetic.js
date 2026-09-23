@@ -4,11 +4,13 @@ const path = require("path");
 const COUNT = 1567;
 const SEED = 208304;
 const bounds = { minLat: 27.60, maxLat: 27.78, minLon: 85.20, maxLon: 85.50 };
+const { RESEARCH_SEVERITY } = require("../config/severity");
+
 const categories = [
-  { name: "theft", severity: 2 },
-  { name: "suspicious", severity: 1 },
-  { name: "harassment", severity: 3 },
-  { name: "infrastructure", severity: 1 }
+  { name: "theft", severity: RESEARCH_SEVERITY.theft },
+  { name: "suspicious", severity: RESEARCH_SEVERITY.suspicious },
+  { name: "harassment", severity: RESEARCH_SEVERITY.harassment },
+  { name: "infrastructure", severity: RESEARCH_SEVERITY.infrastructure }
 ];
 
 let seed = SEED;
