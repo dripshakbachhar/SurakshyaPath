@@ -14,9 +14,10 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
 body {
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans Devanagari", sans-serif;
-  background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text); display: flex; flex-direction: column;
 }
 
 /* ------------------------------- header --------------------------------- */
@@ -52,10 +53,10 @@ nav#tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .stat label { font-size: 11px; color: var(--muted); }
 
 /* ------------------------------ main layout ------------------------------ */
-.layout { flex: 1; display: flex; min-height: 0; }
-#map { flex: 1; min-width: 0; background: #0a0f1c; }
+.layout { flex: 1 1 auto; display: flex; min-height: 0; overflow: hidden; }
+#map { flex: 1 1 auto; min-width: 0; min-height: 0; background: #0a0f1c; }
 aside#panel {
-  width: 400px; max-width: 46vw; overflow-y: auto; background: var(--panel);
+  width: 400px; max-width: 46vw; height: 100%; min-height: 0; overflow-y: auto; overflow-x: hidden; background: var(--panel);
   border-left: 1px solid var(--line); padding: 16px 18px 40px;
 }
 .panel { display: none; }
@@ -179,9 +180,10 @@ footer { padding: 7px 20px; font-size: 11.5px; color: var(--muted); background: 
 
 /* ------------------------------ responsive ------------------------------- */
 @media (max-width: 860px) {
-  .layout { flex-direction: column; overflow-y: auto; }
+  html, body { height: auto; min-height: 100%; overflow: auto; }
+  .layout { flex-direction: column; overflow: visible; }
   #map { min-height: 320px; flex: none; }
-  aside#panel { width: 100%; max-width: none; border-left: none; border-top: 1px solid var(--line); }
+  aside#panel { width: 100%; max-width: none; height: auto; min-height: 0; overflow: visible; border-left: none; border-top: 1px solid var(--line); }
 }
 
 /* --------------------------- map zone information ------------------------ */
