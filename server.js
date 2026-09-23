@@ -1,8 +1,6 @@
 /* ============================================================================
    SurakshyaPath (सुरक्षापथ) — Backend
    ----------------------------------------------------------------------------
-   A small, readable Express API that powers the demo.
-
    Core features:
      1. Anonymous incident reporting      POST /api/reports
      2. Dynamic risk-zone computation     GET  /api/zones
@@ -10,11 +8,12 @@
      4. Patrol route computation          GET  /api/patrol
      5. Officer resource allocation       GET  /api/allocation
 
-   Risk modelling is implemented separately in:
+   Algorithms are separated into:
      ./algorithms/risk.js
+     ./algorithms/routing.js
 
-   Data is stored in ./data/incidents.json (auto-seeded with sample data
-   on first run).
+   Data is stored in:
+     ./data/incidents.json
    ========================================================================== */
 
 const express = require('express');
@@ -24,6 +23,10 @@ const path = require('path');
 const {
   computeZones: computeZonesFromModel,
 } = require('./algorithms/risk');
+
+const {
+  computePatrol: computePatrolFromModel,
+} = require('./algorithms/routing');
 
 const app = express();
 
@@ -129,10 +132,6 @@ const STATIONS = [
   },
 ];
 
-/*
- * Incident types and their severity weights.
- * These values are consumed by algorithms/risk.js.
- */
 const TYPES = {
   theft: {
     label: 'Theft / Pickpocketing',
@@ -329,16 +328,28 @@ function seedIncidents() {
   let id = 1;
 
   for (const [zoneId, profile] of Object.entries(SEED_PROFILE)) {
-    const zone = ZONES.find((z) => z.id === zoneId);
+    const zone = ZONES.find(
+      (z) => z.id === zoneId
+    );
 
     for (let i = 0; i < profile.count; i++) {
-      const daysAgo = Math.random() * 30;
+      const daysAgo =
+        Math.random() * 30;
 
       const nightRoll =
         Math.random() < profile.night;
 
       const hour = nightRoll
-        ? rand([20, 21, 22, 23, 0, 1, 2, 3])
+        ? rand([
+            20,
+            21,
+            22,
+            23,
+            0,
+            1,
+            2,
+            3,
+          ])
         : rand([
             8,
             9,
@@ -354,17 +365,23 @@ function seedIncidents() {
           ]);
 
       const date = new Date(
-        Date.now() - daysAgo * DAY_MS
+        Date.now() -
+          daysAgo * DAY_MS
       );
 
       date.setHours(
         hour,
-        Math.floor(Math.random() * 60),
+        Math.floor(
+          Math.random() * 60
+        ),
         0,
         0
       );
 
-      const type = weightedPick(profile.types);
+      const type =
+        weightedPick(
+          profile.types
+        );
 
       incidents.push({
         id: id++,
@@ -373,17 +390,21 @@ function seedIncidents() {
 
         lat: +(
           zone.lat +
-          (Math.random() - 0.5) * 0.012
+          (Math.random() - 0.5) *
+            0.012
         ).toFixed(5),
 
         lng: +(
           zone.lng +
-          (Math.random() - 0.5) * 0.012
+          (Math.random() - 0.5) *
+            0.012
         ).toFixed(5),
 
         ts: date.getTime(),
 
-        note: rand(SAMPLE_NOTES[type]),
+        note: rand(
+          SAMPLE_NOTES[type]
+        ),
       });
     }
   }
@@ -396,7 +417,10 @@ function seedIncidents() {
 function load() {
   try {
     return JSON.parse(
-      fs.readFileSync(DATA_FILE, 'utf8')
+      fs.readFileSync(
+        DATA_FILE,
+        'utf8'
+      )
     );
   } catch {
     return null;
@@ -406,16 +430,23 @@ function load() {
 function save() {
   fs.mkdirSync(
     path.dirname(DATA_FILE),
-    { recursive: true }
+    {
+      recursive: true,
+    }
   );
 
   fs.writeFileSync(
     DATA_FILE,
-    JSON.stringify(incidents, null, 2)
+    JSON.stringify(
+      incidents,
+      null,
+      2
+    )
   );
 }
 
-let incidents = load() || seedIncidents();
+let incidents =
+  load() || seedIncidents();
 
 save();
 
@@ -424,18 +455,19 @@ save();
    3. Geographic helpers
    ------------------------------------------------------------------------- */
 
-/*
- * Great-circle distance between two latitude/longitude points.
- * Returns distance in kilometres.
- */
 function haversine(a, b) {
   const R = 6371;
 
-  const toRad = (d) =>
-    (d * Math.PI) / 180;
+  const toRad = (degrees) =>
+    (degrees * Math.PI) / 180;
 
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
+  const dLat = toRad(
+    b.lat - a.lat
+  );
+
+  const dLng = toRad(
+    b.lng - a.lng
+  );
 
   const h =
     Math.sin(dLat / 2) ** 2 +
@@ -446,22 +478,32 @@ function haversine(a, b) {
   return (
     2 *
     R *
-    Math.asin(Math.sqrt(h))
+    Math.asin(
+      Math.sqrt(h)
+    )
   );
 }
 
 function nearestZone(lat, lng) {
   let best = ZONES[0];
-  let bestDistance = Infinity;
+
+  let bestDistance =
+    Infinity;
 
   for (const zone of ZONES) {
-    const distance = haversine(
-      { lat, lng },
-      zone
-    );
+    const distance =
+      haversine(
+        { lat, lng },
+        zone
+      );
 
-    if (distance < bestDistance) {
-      bestDistance = distance;
+    if (
+      distance <
+      bestDistance
+    ) {
+      bestDistance =
+        distance;
+
       best = zone;
     }
   }
@@ -474,14 +516,6 @@ function nearestZone(lat, lng) {
    4. Risk model interface
    ------------------------------------------------------------------------- */
 
-/*
- * The actual risk model now lives in:
- *
- *     algorithms/risk.js
- *
- * Keeping this wrapper means the rest of the backend can continue calling
- * computeZones() without needing to know how the risk model is implemented.
- */
 function computeZones() {
   return computeZonesFromModel({
     zones: ZONES,
@@ -492,21 +526,16 @@ function computeZones() {
 
 
 /* ---------------------------------------------------------------------------
-   5. Patrol route computation
+   5. Patrol route interface
    ------------------------------------------------------------------------- */
 
 /*
- * Nearest-neighbour patrol route:
+ * The actual routing algorithm now lives in:
  *
- * station
- *   ↓
- * closest high-risk zone
- *   ↓
- * closest remaining high-risk zone
- *   ↓
- * ...
+ *     algorithms/routing.js
  *
- * This is a heuristic rather than an exact TSP solution.
+ * This wrapper connects the algorithm to the application's
+ * stations and current risk zones.
  */
 function computePatrol(
   stationId,
@@ -517,66 +546,14 @@ function computePatrol(
       (s) => s.id === stationId
     ) || STATIONS[0];
 
-  const zones = computeZones()
-    .filter((zone) => zone.count > 0)
-    .slice(0, stopCount);
+  const zones =
+    computeZones();
 
-  let current = {
-    lat: station.lat,
-    lng: station.lng,
-  };
-
-  const remaining = [...zones];
-
-  const stops = [];
-
-  let totalKm = 0;
-
-  while (remaining.length) {
-    let index = 0;
-    let bestDistance = Infinity;
-
-    remaining.forEach((zone, i) => {
-      const distance = haversine(
-        current,
-        zone
-      );
-
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        index = i;
-      }
-    });
-
-    const next =
-      remaining.splice(index, 1)[0];
-
-    totalKm += bestDistance;
-
-    stops.push({
-      ...next,
-      legKm: +bestDistance.toFixed(2),
-    });
-
-    current = next;
-  }
-
-  /*
-   * Approximate travel time:
-   *   25 km/h city driving
-   *   + 10 minutes at every patrol stop
-   */
-  const totalMin = Math.round(
-    (totalKm / 25) * 60 +
-      stops.length * 10
-  );
-
-  return {
+  return computePatrolFromModel({
     station,
-    stops,
-    totalKm: +totalKm.toFixed(1),
-    totalMin,
-  };
+    zones,
+    stopCount,
+  });
 }
 
 
@@ -584,16 +561,14 @@ function computePatrol(
    6. Officer resource allocation
    ------------------------------------------------------------------------- */
 
-/*
- * Largest-remainder proportional allocation.
- *
- * The number of officers is distributed according to zone risk scores.
- */
 function computeAllocation(
   officers = 12
 ) {
-  const zones = computeZones()
-    .filter((zone) => zone.count > 0);
+  const zones =
+    computeZones().filter(
+      (zone) =>
+        zone.count > 0
+    );
 
   if (
     !zones.length ||
@@ -612,26 +587,33 @@ function computeAllocation(
       0
     ) || 1;
 
-  const staffed = zones.slice(
-    0,
-    Math.min(
-      officers,
-      zones.length
-    )
-  );
+  const staffed =
+    zones.slice(
+      0,
+      Math.min(
+        officers,
+        zones.length
+      )
+    );
 
-  const shares = staffed.map(
-    (zone) =>
-      (zone.score / totalScore) *
-      officers
-  );
+  const shares =
+    staffed.map(
+      (zone) =>
+        (zone.score /
+          totalScore) *
+        officers
+    );
 
-  const assigned = shares.map(
-    (share) => ({
-      floor: Math.floor(share),
-      rem: share % 1,
-    })
-  );
+  const assigned =
+    shares.map(
+      (share) => ({
+        floor:
+          Math.floor(share),
+
+        rem:
+          share % 1,
+      })
+    );
 
   let left =
     officers -
@@ -642,18 +624,25 @@ function computeAllocation(
     );
 
   assigned
-    .map((item, index) => ({
-      index,
-      rem: item.rem,
-    }))
-    .sort(
-      (a, b) => b.rem - a.rem
+    .map(
+      (item, index) => ({
+        index,
+        rem: item.rem,
+      })
     )
-    .forEach((item) => {
-      if (left-- > 0) {
-        assigned[item.index].floor++;
+    .sort(
+      (a, b) =>
+        b.rem - a.rem
+    )
+    .forEach(
+      (item) => {
+        if (left-- > 0) {
+          assigned[
+            item.index
+          ].floor++;
+        }
       }
-    });
+    );
 
   return {
     officers,
@@ -667,21 +656,28 @@ function computeAllocation(
           peak !== null
             ? String(
                 (peak + 23) % 24
-              ).padStart(2, '0')
+              ).padStart(
+                2,
+                '0'
+              )
             : '18';
 
         const to =
           peak !== null
             ? String(
                 (peak + 3) % 24
-              ).padStart(2, '0')
+              ).padStart(
+                2,
+                '0'
+              )
             : '22';
 
         return {
           ...zone,
 
           officers:
-            assigned[index].floor,
+            assigned[index]
+              .floor,
 
           window:
             `${from}:00–${to}:00`,
@@ -696,9 +692,6 @@ function computeAllocation(
    7. API routes
    ------------------------------------------------------------------------- */
 
-/*
- * Bootstrap data for the frontend.
- */
 app.get(
   '/api/meta',
   (_req, res) => {
@@ -706,20 +699,14 @@ app.get(
       zones: ZONES,
       stations: STATIONS,
       types: TYPES,
-      generatedAt: Date.now(),
+      generatedAt:
+        Date.now(),
     });
   }
 );
 
 
-/*
- * Anonymous incident reporting.
- *
- * No identity fields are accepted:
- *   - no name
- *   - no phone
- *   - no account
- */
+/* Anonymous incident reporting */
 app.post(
   '/api/reports',
   (req, res) => {
@@ -730,14 +717,21 @@ app.post(
     } = req.body || {};
 
     if (!TYPES[type]) {
-      return res.status(400).json({
-        error:
-          'Unknown incident type.',
-      });
+      return res
+        .status(400)
+        .json({
+          error:
+            'Unknown incident type.',
+        });
     }
 
-    const lat = Number(req.body.lat);
-    const lng = Number(req.body.lng);
+    const lat = Number(
+      req.body.lat
+    );
+
+    const lng = Number(
+      req.body.lng
+    );
 
     if (
       !(
@@ -747,10 +741,12 @@ app.post(
         lng <= 85.6
       )
     ) {
-      return res.status(400).json({
-        error:
-          'Location outside the serviced municipality area.',
-      });
+      return res
+        .status(400)
+        .json({
+          error:
+            'Location outside the serviced municipality area.',
+        });
     }
 
     const tsMap = {
@@ -770,7 +766,10 @@ app.post(
     };
 
     const zone =
-      nearestZone(lat, lng);
+      nearestZone(
+        lat,
+        lng
+      );
 
     const report = {
       id: incidents.length
@@ -794,41 +793,41 @@ app.post(
           Date.now()
       ),
 
-      note: String(note).slice(
-        0,
-        280
-      ),
+      note: String(
+        note
+      ).slice(0, 280),
     };
 
-    incidents.push(report);
+    incidents.push(
+      report
+    );
 
     save();
 
-    res.status(201).json({
-      ok: true,
-      report,
+    res
+      .status(201)
+      .json({
+        ok: true,
+        report,
 
-      zone: {
-        id: zone.id,
-        name: zone.name,
-        np: zone.np,
-      },
-    });
+        zone: {
+          id: zone.id,
+          name: zone.name,
+          np: zone.np,
+        },
+      });
   }
 );
 
 
-/*
- * Recent raw reports.
- *
- * Used by the frontend for map markers.
- */
+/* Recent raw reports */
 app.get(
   '/api/reports',
   (req, res) => {
     const days =
-      Number(req.query.days) ||
-      30;
+      Number(
+        req.query.days
+      ) || 30;
 
     const cutoff =
       Date.now() -
@@ -837,16 +836,15 @@ app.get(
     res.json(
       incidents.filter(
         (incident) =>
-          incident.ts >= cutoff
+          incident.ts >=
+          cutoff
       )
     );
   }
 );
 
 
-/*
- * Dynamic risk zones.
- */
+/* Dynamic risk zones */
 app.get(
   '/api/zones',
   (_req, res) => {
@@ -857,9 +855,7 @@ app.get(
 );
 
 
-/*
- * Timing and frequency analytics.
- */
+/* Timing & frequency analytics */
 app.get(
   '/api/analytics',
   (_req, res) => {
@@ -870,12 +866,15 @@ app.get(
     const recent =
       incidents.filter(
         (incident) =>
-          incident.ts >= cutoff
+          incident.ts >=
+          cutoff
       );
 
     const byType =
       Object.fromEntries(
-        Object.keys(TYPES).map(
+        Object.keys(
+          TYPES
+        ).map(
           (type) => [
             type,
             0,
@@ -895,8 +894,13 @@ app.get(
         })
       );
 
-    for (const incident of recent) {
-      byType[incident.type]++;
+    for (
+      const incident
+      of recent
+    ) {
+      byType[
+        incident.type
+      ]++;
 
       byHour[
         new Date(
@@ -937,7 +941,8 @@ app.get(
       ).length;
 
     res.json({
-      total: recent.length,
+      total:
+        recent.length,
 
       byType,
 
@@ -957,24 +962,28 @@ app.get(
       topZones:
         computeZones()
           .slice(0, 5)
-          .map((zone) => ({
-            name: zone.name,
-            score: zone.score,
-          })),
+          .map(
+            (zone) => ({
+              name:
+                zone.name,
+
+              score:
+                zone.score,
+            })
+          ),
     });
   }
 );
 
 
-/*
- * Patrol route.
- */
+/* Patrol route */
 app.get(
   '/api/patrol',
   (req, res) => {
     res.json(
       computePatrol(
         req.query.station,
+
         Math.min(
           Number(
             req.query.stops
@@ -987,9 +996,7 @@ app.get(
 );
 
 
-/*
- * Officer allocation.
- */
+/* Officer allocation */
 app.get(
   '/api/allocation',
   (req, res) => {
