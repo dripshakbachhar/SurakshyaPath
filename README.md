@@ -2,9 +2,17 @@
 
 **An experimental system for incident analysis, risk modelling, patrol routing, and resource allocation.**
 
+SurakshyaPath began as a hackathon prototype for anonymous incident reporting and map-based risk visualization. It is now a reproducible engineering and research project for testing how different risk-scoring assumptions affect geographic prioritization and downstream patrol and resource-allocation decisions.
+
+## Research question
+
+**How do different, explainable risk-scoring assumptions change geographic prioritization, patrol routing, and resource allocation when evaluated on the same synthetic dataset?**
+
+The project deliberately compares multiple models rather than treating one scoring formula as objectively correct.
+
 SurakshyaPath started as a hackathon prototype for anonymous incident reporting and map-based risk visualization. It is now being developed as a small, reproducible engineering project for exploring how different risk-scoring assumptions affect geographic prioritization and downstream patrol/resource decisions.
 
-> **Important:** this project does not claim to predict crime or represent real incident-level police records. The current spatial dataset is synthetic. Official Nepal Police data is used only as an aggregate monthly reference.
+> **Important:** this project does not claim to predict crime or represent real incident-level police records. The current spatial dataset is synthetic. Official aggregate statistics are used only as reference context.
 
 ## What the project does
 
@@ -62,6 +70,8 @@ These experiments ask how sensitive geographic prioritization is to the assumpti
 
 ### Risk-model sensitivity
 
+Across five deterministic synthetic seeds, the severity-only model produces substantially different geographic rankings, while the frequency-based variants remain close to the frequency reference.
+
 Run:
 
 ```bash
@@ -80,7 +90,7 @@ npm run patrol-experiments
 
 The patrol experiment selects the five highest-scoring zones under each model, runs the application's nearest-neighbour heuristic, and compares it with a simple 2-opt route-order improvement.
 
-In the current synthetic coordinate experiment, the severity-only model selects a different set of five zones. For the frequency-based/current models, 2-opt reduces the open-route estimate from about **24.20 km to 22.49 km**. These are algorithm-test results, not road-network travel distances or patrol recommendations.
+In the current synthetic coordinate experiment, the severity-only model selects a different set of five zones. For the frequency-based/current models, 2-opt reduces the open-route estimate from **23.62 km to 22.31 km**. These are algorithm-test results, not road-network travel distances or patrol recommendations.
 
 ### Resource-allocation sensitivity
 
@@ -101,7 +111,7 @@ For the 12-officer scenario, the synthetic experiment produces:
 | Frequency × severity | Bouddha 3, Koteshwor 3, Balaju 2, Kirtipur 2 |
 | Severity × recency | Bouddha 3, Koteshwor 3, Kirtipur 2, plus smaller allocations including Gongabu |
 
-Compared with the current severity × recency model at 12 officers, the frequency-only and frequency × severity models change the integer allocation in **2 zones**, while the severity-only model changes it in **6 zones**. This illustrates how scoring assumptions can propagate into discrete resource decisions on the synthetic dataset.
+For the canonical 12-officer experiment, the frequency-only, frequency × severity, and current severity × recency models produce the same integer allocation pattern. The severity-only model produces a different allocation across multiple zones. This illustrates how scoring assumptions can propagate into discrete resource decisions on the synthetic dataset.
 
 Results are written to `experiments/results/`.
 
@@ -144,8 +154,12 @@ The goal is not to build a black-box prediction system. It is to make the assump
 - [x] Alternative risk-model experiments
 - [x] Patrol-route sensitivity experiment
 - [x] Resource-allocation sensitivity experiment
+- [x] Five-seed robustness experiment
+- [x] Deterministic validation
+- [x] Reproducible research figures
+- [x] Research results and limitations documentation
 - [ ] Final dashboard/experiment visualization
-- [ ] Portfolio-ready documentation and screenshots
+- [ ] Portfolio-ready screenshots and demo documentation
 
 ## Limitations
 
@@ -156,6 +170,23 @@ The goal is not to build a black-box prediction system. It is to make the assump
 - Resource allocations are mathematical outputs, not real staffing recommendations.
 - Risk scores depend on explicit assumptions about severity and recency.
 - Results from the synthetic dataset should not be interpreted as real-world crime predictions.
+
+## Responsible use
+
+- The spatial incident layer is synthetic.
+- Aggregate official statistics are not equivalent to geocoded incident records.
+- Nearest-zone assignment is a simplified spatial abstraction.
+- Severity values are explicit modelling assumptions.
+- Recency uses a fixed 30-day window and a minimum decay weight.
+- Resource allocation uses a fixed officer count and largest-remainder rounding.
+- Patrol routing uses a nearest-neighbour heuristic rather than an exact routing solver.
+- Route comparisons use great-circle coordinate distance rather than a road network, traffic, or travel-time API.
+- Synthetic scenario replications are not independent real-world observations.
+- Results are descriptive and deterministic, not statistical inference.
+- Resource-allocation outputs are algorithmic test results, not operational staffing recommendations.
+- Any real-world deployment would require validated data, domain expertise, legal and ethical review, security controls, auditability, and meaningful human oversight.
+
+**Reproducibility does not imply real-world validity.**
 
 ## License
 
