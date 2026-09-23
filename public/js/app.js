@@ -255,12 +255,37 @@ $('#report-form').onsubmit=async e=>{
 $('#toggle-heat').onchange=e=>e.target.checked?layers.heat.addTo(map):map.removeLayer(layers.heat);
 $('#toggle-markers').onchange=e=>e.target.checked?layers.markers.addTo(map):map.removeLayer(layers.markers);
 
+const PATROL_STORAGE_KEY='surakshyaPath.patrolPlan.v1';
+
+function savePatrolPlan(route,alloc,station,stops,officers){
+  try{
+    localStorage.setItem(PATROL_STORAGE_KEY,JSON.stringify({route,alloc,station,stops,officers}));
+  }catch{}
+}
+
+function restorePatrolPlan(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(PATROL_STORAGE_KEY)||'null');
+    if(!saved?.route||!saved?.alloc) return;
+    if(saved.station && [...$('#p-station').options].some(o=>o.value===saved.station)) $('#p-station').value=saved.station;
+    if(saved.stops) $('#p-stops').value=saved.stops;
+    if(saved.officers) $('#p-officers').value=saved.officers;
+    drawRoute(saved.route,saved.alloc);
+  }catch{
+    localStorage.removeItem(PATROL_STORAGE_KEY);
+  }
+}
+
 /* ------------------------------ patrol ----------------------------------- */
 $('#p-generate').onclick=async()=>{
   const button=$('#p-generate');button.disabled=true;button.textContent='Generating…';
   try{
     const station=encodeURIComponent($('#p-station').value),stops=clamp(Number($('#p-stops').value)||5,1,10),officers=clamp(Number($('#p-officers').value)||12,2,40);
     const [route,alloc]=await Promise.all([getJSON(`${API}/patrol?station=${station}&stops=${stops}`),getJSON(`${API}/allocation?officers=${officers}`)]);
+    $('#p-station').value=station;
+    $('#p-stops').value=stops;
+    $('#p-officers').value=officers;
+    savePatrolPlan(route,alloc,station,stops,officers);
     drawRoute(route,alloc);
   }catch(err){toast(err.message||'Could not generate patrol plan.',false);}finally{button.disabled=false;button.textContent='Generate patrol plan';}
 };
@@ -287,7 +312,7 @@ function drawRoute(route,alloc){
     const meta=await getJSON(`${API}/config`);
     state.types=meta.types||{};
     $('#p-station').innerHTML=(meta.stations||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
-    await refreshData(); setTab('overview');
+    await refreshData(); restorePatrolPlan(); setTab('overview');
     useMyLocation._available=!!navigator.geolocation;
     setInterval(refreshData,60000);
     window.addEventListener('resize',()=>{map.invalidateSize();if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));});
