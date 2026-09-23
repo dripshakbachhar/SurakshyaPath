@@ -1,0 +1,41 @@
+model,zone,normalized_risk,assigned_officers
+frequency-only,Thamel,5.8824,0
+frequency-only,Kalimati,17.1946,1
+frequency-only,New Baneshwor,5.2036,0
+frequency-only,Chabahil,9.276,0
+frequency-only,Koteshwor,80.9955,3
+frequency-only,Balaju,41.4027,2
+frequency-only,Patan,23.3032,1
+frequency-only,Gongabu,11.3122,0
+frequency-only,Kirtipur,59.9548,2
+frequency-only,Bouddha,100,3
+severity-only,Thamel,96.2537,1
+severity-only,Kalimati,93.8824,1
+severity-only,New Baneshwor,87.9729,1
+severity-only,Chabahil,100,2
+severity-only,Koteshwor,96.9745,2
+severity-only,Balaju,95.1458,1
+severity-only,Patan,93.5695,1
+severity-only,Gongabu,94.7792,1
+severity-only,Kirtipur,96.8488,1
+severity-only,Bouddha,95.4105,1
+frequency-severity,Thamel,5.8824,0
+frequency-severity,Kalimati,17.1946,1
+frequency-severity,New Baneshwor,5.2036,0
+frequency-severity,Chabahil,9.276,0
+frequency-severity,Koteshwor,80.9955,3
+frequency-severity,Balaju,41.4027,2
+frequency-severity,Patan,23.3032,1
+frequency-severity,Gongabu,11.3122,0
+frequency-severity,Kirtipur,59.9548,2
+frequency-severity,Bouddha,100,3
+current-severity-recency,Thamel,7.4377,0
+current-severity-recency,Kalimati,18.2295,1
+current-severity-recency,New Baneshwor,5.458,0
+current-severity-recency,Chabahil,11.4411,0
+current-severity-recency,Koteshwor,80.4641,3
+current-severity-recency,Balaju,40.8752,1
+current-severity-recency,Patan,22.2409,1
+current-severity-recency,Gongabu,12.8597,1
+current-severity-recency,Kirtipur,61.7777,2
+current-severity-recency,Bouddha,100,3
