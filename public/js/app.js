@@ -17,7 +17,7 @@ const TYPE_META = {
 const BAND_COLOR = { low: '#22c55e', moderate: '#eab308', high: '#f97316', critical: '#ef4444' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const state = { reports: [], zones: [], pick: null, tab: 'report' };
+const state = { reports: [], zones: [], types: {}, pick: null, tab: 'report' };
 
 /* --------------------------------- helpers ------------------------------- */
 
@@ -91,14 +91,13 @@ function useMyLocation() {
 /* ------------------------------ data rendering --------------------------- */
 
 async function refreshData() {
-  const [zones, reports, analytics] = await Promise.all([
-    getJSON(`${API}/risk`), getJSON(`${API}/incidents`), getJSON(`${API}/analytics`),
-  ]);
-  state.zones = zones; state.reports = reports;
+  const dashboard = await getJSON(`${API}/dashboard`);
+  const { zones, incidents, analytics } = dashboard;
+  state.zones = zones; state.reports = incidents;
 
   // Stat chips
-  $('#stat-total').textContent = reports.length;
-  if (analytics.total !== reports.length) console.warn('Incident count mismatch:', { api: reports.length, analytics: analytics.total });
+  $('#stat-total').textContent = incidents.length;
+  if (analytics.total !== incidents.length) console.warn('Incident count mismatch:', { incidents: incidents.length, analytics: analytics.total });
   $('#stat-zones').textContent = zones.filter((z) => z.count > 0).length;
   $('#stat-critical').textContent = zones.filter((z) => z.band === 'high' || z.band === 'critical').length;
   const night = reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
@@ -136,7 +135,8 @@ function drawMarkers() {
 function drawHeat() {
   layers.heat.clearLayers();
   // Heatmap is a visual layer; risk scores remain authoritative from /api/risk.
-  const pts = state.reports.map((r) => [r.lat, r.lng, TYPE_META[r.type]?.severity ? TYPE_META[r.type].severity / 7 : 0.5]);
+  const maxSeverity = Math.max(...Object.values(state.types).map((type) => type.severity), 1);
+  const pts = state.reports.map((r) => [r.lat, r.lng, (state.types[r.type]?.severity || 0) / maxSeverity]);
   if (pts.length) L.heatLayer(pts, {
     radius: 26, blur: 16, maxZoom: 15, minOpacity: 0.35,
     gradient: { 0.2: '#1d4ed8', 0.4: '#22c55e', 0.6: '#eab308', 0.8: '#f97316', 1: '#ef4444' },
@@ -293,6 +293,7 @@ function drawRoute(route, alloc) {
 
 (async function boot() {
   const meta = await getJSON(`${API}/config`);
+  state.types = meta.types;
   $('#p-station').innerHTML = meta.stations
     .map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   await refreshData();
