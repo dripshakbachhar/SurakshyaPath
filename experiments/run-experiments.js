@@ -66,17 +66,9 @@ for (const [zone, records] of Object.entries(grouped)) {
   }, 0);
 }
 
-function normalize(scores) {
-  const max = Math.max(...Object.values(scores), 1);
-  return Object.fromEntries(Object.entries(scores).map(([z, v]) => [z, (v / max) * 100]));
-}
+const { scoreModels } = require("../algorithms/research-models");
 
-const models = {
-  "frequency-only": normalize(frequency),
-  "severity-only": normalize(severity),
-  "frequency-severity": normalize(frequencySeverity),
-  "current-severity-recency": normalize(current)
-};
+const models = scoreModels(incidents, zones.map(z => z[0]));
 
 fs.mkdirSync(outputDir, { recursive: true });
 
