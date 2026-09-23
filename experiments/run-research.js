@@ -4,6 +4,7 @@ const steps = [
   ["research-experiments", "experiments/run-experiments.js"],
   ["patrol-experiments", "experiments/run-patrol-experiments.js"],
   ["allocation-experiments", "experiments/run-allocation-experiments.js"],
+  ["summarize-results", "experiments/summarize-results.js"]
 ];
 
 console.log("Running SurakshyaPath research pipeline...");
