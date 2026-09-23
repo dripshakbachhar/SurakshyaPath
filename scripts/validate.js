@@ -50,7 +50,7 @@ assert.deepEqual(scoreModels(incidents, zoneNames), scoreModels(incidents, zoneN
 
 const allocation = computeAllocation({
   officers: 12,
-  zones: ZONES.map((zone, i) => ({
+  zones: ZONES.map(zone => ({
     ...zone,
     count: counts[zone.name],
     score: models["current-severity-recency"][zone.name],
@@ -64,7 +64,7 @@ assert.equal(
 assert.ok(allocation.zones.every(zone => zone.officers >= 0));
 
 const station = { name: "Validation Station", lat: 27.705, lng: 85.315 };
-const patrolZones = ZONES.map((zone, i) => ({
+const patrolZones = ZONES.map(zone => ({
   ...zone,
   count: counts[zone.name],
   score: models["current-severity-recency"][zone.name],
@@ -82,12 +82,18 @@ const types = {
   infrastructure: { severity: 2 }
 };
 const liveIncidents = [
-  { zone: "thamel", type: "theft", createdAt: now - 3600000 },
-  { zone: "bouddha", type: "harassment", createdAt: now - 7200000 }
+  { zone: "thamel", type: "theft", ts: now - 3600000 },
+  { zone: "bouddha", type: "harassment", ts: now - 7200000 }
 ];
-assert.deepEqual(
-  computeZones({ zones: ZONES, incidents: liveIncidents, types, now }),
-  computeZones({ zones: ZONES, incidents: liveIncidents, types, now })
-);
+
+const riskA = computeZones({ zones: ZONES, incidents: liveIncidents, types, now });
+const riskB = computeZones({ zones: ZONES, incidents: liveIncidents, types, now });
+
+assert.deepEqual(riskA, riskB);
+assert.equal(riskA.reduce((sum, zone) => sum + zone.count, 0), 2);
+assert.ok(riskA.find(zone => zone.id === "thamel").score > 0);
+assert.ok(riskA.find(zone => zone.id === "bouddha").score > 0);
+assert.equal(riskA.find(zone => zone.id === "thamel").count, 1);
+assert.equal(riskA.find(zone => zone.id === "bouddha").count, 1);
 
 console.log("Validation passed: dataset, zones, models, allocation, patrol, and risk are deterministic and consistent.");
