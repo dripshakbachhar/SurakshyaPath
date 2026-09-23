@@ -186,35 +186,98 @@ function renderZoneList() {
 /* --------------------------------- charts -------------------------------- */
 
 const charts = {};
+
 function drawCharts(a) {
-  const ticks = { color: '#8ea0bf', font: { size: 10 } };
-  const grid = { color: 'rgba(255,255,255,.07)' };
-  const mk = (id, cfg) => { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); };
+  const boxes = {
+    type: $('#chart-type').parentElement,
+    hour: $('#chart-hour').parentElement,
+    trend: $('#chart-trend').parentElement,
+  };
 
-  mk('#chart-type', {
-    type: 'doughnut',
-    data: {
-      labels: Object.keys(a.byType).map((t) => TYPE_META[t].label),
-      datasets: [{ data: Object.values(a.byType), backgroundColor: Object.keys(a.byType).map((t) => TYPE_META[t].color), borderWidth: 0 }],
-    },
-    options: { plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } } } }, cutout: '62%' },
+  Object.values(boxes).forEach((box) => {
+    box.querySelectorAll('.chart-fallback').forEach((el) => el.remove());
   });
 
-  mk('#chart-hour', {
-    type: 'bar',
-    data: { labels: [...Array(24)].map((_, h) => h),
-      datasets: [{ data: a.byHour, backgroundColor: a.byHour.map((v, h) => (h >= 20 || h < 4 ? '#ef4444' : '#3b82f6')) }] },
-    options: { plugins: { legend: { display: false } },
-      scales: { x: { ticks, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } } },
-  });
+  if (!a || !a.byType || !Array.isArray(a.byHour) || !Array.isArray(a.byDay)) {
+    return showChartMessage(boxes.type, 'Analytics data is unavailable.');
+  }
 
-  mk('#chart-trend', {
-    type: 'line',
-    data: { labels: a.byDay.map((d, i) => (i === a.byDay.length - 1 ? 'today' : `d-${a.byDay.length - 1 - i}`)),
-      datasets: [{ data: a.byDay.map((d) => d.count), borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,.15)', fill: true, tension: .35, pointRadius: 2 }] },
-    options: { plugins: { legend: { display: false } },
-      scales: { x: { ticks: { color: '#8ea0bf', font: { size: 9 } }, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } } },
-  });
+  if (typeof Chart === 'undefined') {
+    return showChartMessage(boxes.type, 'Chart library did not load. Reload the page to try again.');
+  }
+
+  try {
+    const ticks = { color: '#8ea0bf', font: { size: 10 } };
+    const grid = { color: 'rgba(255,255,255,.07)' };
+    const mk = (id, cfg) => {
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart($(id), cfg);
+    };
+
+    mk('#chart-type', {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(a.byType).map((t) => TYPE_META[t]?.label || t),
+        datasets: [{
+          data: Object.values(a.byType),
+          backgroundColor: Object.keys(a.byType).map((t) => TYPE_META[t]?.color || '#64748b'),
+          borderWidth: 0,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1', boxWidth: 12, font: { size: 11 } } } },
+        cutout: '62%',
+      },
+    });
+
+    mk('#chart-hour', {
+      type: 'bar',
+      data: {
+        labels: [...Array(24)].map((_, h) => h),
+        datasets: [{ data: a.byHour, backgroundColor: a.byHour.map((v, h) => (h >= 20 || h < 4 ? '#ef4444' : '#3b82f6')) }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } },
+      },
+    });
+
+    mk('#chart-trend', {
+      type: 'line',
+      data: {
+        labels: a.byDay.map((d, i) => (i === a.byDay.length - 1 ? 'today' : `d-${a.byDay.length - 1 - i}`)),
+        datasets: [{
+          data: a.byDay.map((d) => d.count),
+          borderColor: '#f5a623',
+          backgroundColor: 'rgba(245,166,35,.15)',
+          fill: true,
+          tension: .35,
+          pointRadius: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ticks: { color: '#8ea0bf', font: { size: 9 } }, grid: { display: false } }, y: { ticks, grid, beginAtZero: true } },
+      },
+    });
+  } catch (error) {
+    console.error('Analytics chart error:', error);
+    showChartMessage(boxes.type, `Analytics chart error: ${error.message}`);
+  }
+}
+
+function showChartMessage(box, message) {
+  const el = document.createElement('div');
+  el.className = 'chart-fallback';
+  el.textContent = message;
+  el.style.cssText = 'padding:24px 8px;text-align:center;color:#8ea0bf;font-size:12px;';
+  box.appendChild(el);
 }
 
 /* ------------------------------ interactions ----------------------------- */
