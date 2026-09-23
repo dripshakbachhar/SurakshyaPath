@@ -44,24 +44,19 @@ function computeAllocation({
       0
     ) || 1;
 
-  const staffed = activeZones.slice(
-    0,
-    Math.min(
-      officers,
-      activeZones.length
-    )
-  );
-
-  const shares = staffed.map(
-    (zone) =>
-      (zone.score / totalScore) *
-      officers
+  const shares = activeZones.map(
+    (zone) => ({
+      zone,
+      share:
+        (zone.score / totalScore) *
+        officers,
+    })
   );
 
   const assigned = shares.map(
-    (share) => ({
-      floor: Math.floor(share),
-      rem: share % 1,
+    (item) => ({
+      floor: Math.floor(item.share),
+      rem: item.share % 1,
     })
   );
 
@@ -79,11 +74,14 @@ function computeAllocation({
       rem: item.rem,
     }))
     .sort(
-      (a, b) => b.rem - a.rem
+      (a, b) =>
+        b.rem - a.rem ||
+        a.index - b.index
     )
     .forEach((item) => {
-      if (remaining-- > 0) {
+      if (remaining > 0) {
         assigned[item.index].floor++;
+        remaining--;
       }
     });
 
