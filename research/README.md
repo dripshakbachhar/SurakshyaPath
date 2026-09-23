@@ -69,6 +69,59 @@ Across five deterministic synthetic scenarios:
 
 These are replications of the **synthetic generator**, not independent real-world observations.
 
+
+## Visual results
+
+The generated figures below provide a quick visual view of the four main experiment families. They are generated from the repository's machine-readable outputs and can be regenerated with `npm run figures`.
+
+### Risk-model comparison
+
+![Risk-model comparison across the four scoring formulations](figures/risk-model-comparison.svg)
+
+This figure shows how the four scoring formulations rank the ten synthetic zones in the canonical scenario.
+
+### Resource-allocation comparison
+
+![Resource-allocation comparison across risk models](figures/allocation-comparison.svg)
+
+This figure shows how model-specific scores propagate into the fixed 12-officer allocation.
+
+### Patrol-route comparison
+
+![Patrol-route comparison for the tested routing procedure](figures/patrol-comparison.svg)
+
+This figure compares the route produced from model-generated priority zones with the 2-opt order improvement.
+
+### Robustness comparison
+
+![Robustness results across five synthetic seeds](figures/robustness-comparison.svg)
+
+This figure summarizes how the model outputs vary across the five deterministic synthetic scenarios.
+
+> **Reading the figures:** visual differences are properties of the implemented algorithms and synthetic generator. They should not be interpreted as maps of actual crime risk or evidence for operational deployment.
+
+## Evidence chain
+
+The research record is intentionally traceable:
+
+```
+synthetic generator
+      ↓
+zone assignment
+      ↓
+risk-model outputs
+      ↓
+allocation / routing experiments
+      ↓
+robustness analysis
+      ↓
+figures + written interpretation
+      ↓
+validation
+```
+
+Each stage can be regenerated from the repository rather than relying on manually edited results.
+
 ## Research documents
 
 - [Results](RESULTS.md) — canonical results, robustness, and reproducibility record.
