@@ -147,22 +147,31 @@ const sampleNotes = {
 // HELPERS
 // ============================================================================
 
-function rand(min, max) {
-  return Math.random() * (max - min) + min;
+function createSeededRandom(seed) {
+  let state = seed >>> 0;
+
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
 }
 
-function weightedPick(items) {
+function rand(min, max, random = Math.random) {
+  return random() * (max - min) + min;
+}
+
+function weightedPick(items, random = Math.random) {
   const total = items.reduce(
     (sum, item) => sum + item.weight,
     0
   );
 
-  let random = Math.random() * total;
+  let value = random() * total;
 
   for (const item of items) {
-    random -= item.weight;
+    value -= item.weight;
 
-    if (random <= 0) {
+    if (value <= 0) {
       return item.name;
     }
   }
@@ -176,6 +185,7 @@ function weightedPick(items) {
 
 function seedIncidents() {
   const incidents = [];
+  const random = createSeededRandom(208304);
 
   const zoneIds = ZONES.map(
     (zone) => zone.id
@@ -187,18 +197,18 @@ function seedIncidents() {
     const type =
       typeIds[
         Math.floor(
-          Math.random() * typeIds.length
+          random() * typeIds.length
         )
       ];
 
     const zone =
       zoneIds[
         Math.floor(
-          Math.random() * zoneIds.length
+          random() * zoneIds.length
         )
       ];
 
-    const ageDays = Math.random() * 30;
+    const ageDays = random() * 30;
 
     const ts =
       Date.now() -
@@ -214,12 +224,12 @@ function seedIncidents() {
       ts: Math.round(ts),
 
       reporter:
-        weightedPick(seedProfiles),
+        weightedPick(seedProfiles, random),
 
       note:
         sampleNotes[type][
           Math.floor(
-            Math.random() *
+            random() *
               sampleNotes[type].length
           )
         ],
@@ -228,13 +238,13 @@ function seedIncidents() {
         ZONES.find(
           (z) => z.id === zone
         ).lat +
-        rand(-0.002, 0.002),
+        rand(-0.002, 0.002, random),
 
       lng:
         ZONES.find(
           (z) => z.id === zone
         ).lng +
-        rand(-0.002, 0.002),
+        rand(-0.002, 0.002, random),
     });
   }
 
@@ -593,9 +603,6 @@ app.get('/api/dashboard', (req, res) => {
   });
 });
 
-// ============================================================================
-// SERVER
-// ============================================================================
 // ============================================================================
 // SERVER
 // ============================================================================
