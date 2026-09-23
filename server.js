@@ -362,8 +362,9 @@ function save(data) {
   }
 }
 
-let incidents =
-  load() || seedIncidents();
+let incidents = load() || seedIncidents();
+let riskCache = null;
+const RISK_CACHE_MS = 60_000;
 
 save(incidents);
 
@@ -400,12 +401,19 @@ function nearestZone(lat, lng) {
 // ============================================================================
 
 function computeZones() {
-  return computeZonesFromModel({
+  const now = Date.now();
+  if (riskCache && now - riskCache.at < RISK_CACHE_MS) return riskCache.zones;
+
+  const zones = computeZonesFromModel({
     zones: ZONES,
     incidents,
     types: TYPES,
     days: 30,
+    now,
   });
+
+  riskCache = { at: now, zones };
+  return zones;
 }
 
 // ============================================================================
@@ -535,7 +543,7 @@ app.post(
     };
 
     incidents.push(incident);
-
+    riskCache = null;
     save(incidents);
 
     res.status(201).json(
