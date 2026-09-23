@@ -114,7 +114,12 @@ function drawZones() {
       color: BAND_COLOR[z.band], weight: 1.5, fillColor: BAND_COLOR[z.band],
       fillOpacity: 0.14, dashArray: '4 4',
     })
-      .bindPopup(`<b>${esc(z.name)} (${esc(z.np)})</b><br>Risk score: <b style="color:${BAND_COLOR[z.band]}">${z.score}/100 · ${z.band}</b><br>${z.count} reports in 30 days${z.peakHour !== null ? `<br>Peak hour: <b>${z.peakHour}:00</b>` : ''}`)
+      .bindTooltip(`<b>${esc(z.name)}</b> · ${z.score}/100`, {
+        permanent: true,
+        direction: 'center',
+        className: 'zone-label',
+      })
+      .bindPopup(`<b>${esc(z.name)} (${esc(z.np)})</b><br>Risk score: <b style="color:${BAND_COLOR[z.band]}">${z.score}/100 · ${z.band}</b><br>${z.count} reports in 30 days${z.peakHour !== null ? `<br>Peak hour: <b>${z.peakHour}:00</b>` : ''}<br>Location: ${z.lat.toFixed(5)}, ${z.lng.toFixed(5)}`)
       .addTo(layers.zones);
   }
 }
@@ -127,7 +132,7 @@ function drawMarkers() {
     L.circleMarker([r.lat, r.lng], {
       radius: 5, color: '#0b1220', weight: 1, fillColor: m.color, fillOpacity: 0.95,
     })
-      .bindPopup(`<b>${m.icon} ${m.label}</b><br>${esc(r.note || 'No description')}<br><span class="muted">${timeAgo(r.ts)}</span>`)
+      .bindPopup(`<b>${m.icon} ${m.label}</b><br>Location: ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}<br>${esc(r.note || 'No description')}<br><span class="muted">${timeAgo(r.ts)}</span>`)
       .addTo(layers.markers);
   }
 }
