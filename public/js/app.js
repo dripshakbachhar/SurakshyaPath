@@ -1,526 +1,286 @@
-/* ============================================================================
-   SurakshyaPath — Frontend application (vanilla JS, no build step)
-   Talks to the Express API with relative URLs, so it works on any host.
-   ========================================================================== */
-
 'use strict';
 
-/* ------------------------------ state & constants ------------------------ */
-
-const API = '/api';                    // same-origin API
+const API = '/api';
 const TYPE_META = {
-  theft:          { label: 'Theft / Pickpocketing', icon: '💼', color: '#f5a623' },
-  suspicious:     { label: 'Suspicious Activity',   icon: '🕵️', color: '#a78bfa' },
-  harassment:     { label: 'Harassment',            icon: '🆘', color: '#ef4444' },
-  infrastructure: { label: 'Infrastructure Issue',  icon: '⚠️', color: '#38bdf8' },
+  theft: { label: 'Theft / Pickpocketing', icon: '💼', color: '#f5a623' },
+  suspicious: { label: 'Suspicious Activity', icon: '🕵️', color: '#a78bfa' },
+  harassment: { label: 'Harassment', icon: '🆘', color: '#ef4444' },
+  infrastructure: { label: 'Infrastructure Issue', icon: '⚠️', color: '#38bdf8' },
 };
-const BAND_COLOR = { low: '#22c55e', moderate: '#eab308', high: '#f97316', critical: '#ef4444' };
-const DAY_MS = 24 * 60 * 60 * 1000;
+const BAND_COLOR = { low:'#22c55e', moderate:'#eab308', high:'#f97316', critical:'#ef4444' };
+const state = { reports:[], zones:[], types:{}, analytics:null, pick:null, tab:'overview', loading:false };
 
-const state = { reports: [], zones: [], types: {}, analytics: null, pick: null, tab: 'report', loading: false };
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (n,min,max) => Math.max(min,Math.min(max,n));
+const timeAgo = ts => {
+  const h = Math.floor((Date.now()-Number(ts))/3600000);
+  return h < 1 ? 'just now' : h < 24 ? h+'h ago' : Math.floor(h/24)+'d ago';
+};
 
-/* --------------------------------- helpers ------------------------------- */
-
-const $ = (sel) => document.querySelector(sel);
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-function toast(msg, ok = true) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.className = `toast show ${ok ? 'ok' : 'err'}`;
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => (t.className = 'toast'), 3200);
+function toast(message, ok=true) {
+  const t=$('#toast'); if(!t) return;
+  t.textContent=message; t.className='toast show '+(ok?'ok':'err');
+  clearTimeout(t._timer); t._timer=setTimeout(()=>t.className='toast',3200);
 }
-
-async function getJSON(url, options = {}) {
-  const res = await fetch(url, { headers: { Accept: 'application/json', ...(options.headers || {}) }, ...options });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+async function getJSON(url, options={}) {
+  const res=await fetch(url,{headers:{Accept:'application/json',...(options.headers||{})},...options});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
-const timeAgo = (ts) => {
-  const h = Math.floor((Date.now() - ts) / 3600e3);
-  return h < 1 ? 'just now' : h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
-};
 
-/* ---------------------------------- map ---------------------------------- */
+/* ------------------------------ map ------------------------------------- */
+const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([27.7054,85.3243],12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',maxZoom:18}).addTo(map);
+const layers={heat:L.layerGroup().addTo(map),markers:L.layerGroup().addTo(map),zones:L.layerGroup().addTo(map),route:L.layerGroup().addTo(map)};
+const defaultView={center:[27.7054,85.3243],zoom:12};
 
-const map = L.map('map', { zoomControl: true }).setView([27.7054, 85.3243], 12);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 18,
-}).addTo(map);
-
-const layers = {
-  heat: L.layerGroup().addTo(map),
-  markers: L.layerGroup().addTo(map),
-  zones: L.layerGroup().addTo(map),
-  route: L.layerGroup().addTo(map),
-};
-
-// Map legend (bottom-right) explaining the risk colours.
-L.Control.Legend = L.Control.extend({
-  onAdd() {
-    const d = L.DomUtil.create('div', 'map-legend');
-    d.innerHTML = Object.entries(BAND_COLOR)
-      .map(([k, c]) => `<span><i style="background:${c}"></i>${k}</span>`).join('');
-    return d;
-  },
-});
-map.addControl(new L.Control.Legend({ position: 'bottomright' }));
-
-// Clicking the map in "Report" mode picks the report location.
-map.on('click', (e) => {
-  if (state.tab !== 'report') return;
-  state.pick = { lat: +e.latlng.lat.toFixed(5), lng: +e.latlng.lng.toFixed(5) };
-  L.circleMarker(e.latlng, { radius: 9, color: '#fff', weight: 2, fillColor: '#f5a623', fillOpacity: 1 })
-    .addTo(layers.markers).bindTooltip('Report location').openTooltip();
-  $('#picked-spot').classList.add('set');
-  $('#picked-spot').innerHTML = `📍 Pinned: ${state.pick.lat}, ${state.pick.lng} <button type="button" id="use-geo" class="mini">use my location</button>`;
-  $('#use-geo').onclick = useMyLocation;
-});
-
-function useMyLocation() {
-  if (!navigator.geolocation) return toast('Geolocation not available', false);
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      state.pick = { lat: +pos.coords.latitude.toFixed(5), lng: +pos.coords.longitude.toFixed(5) };
-      map.setView([state.pick.lat, state.pick.lng], 14);
-      $('#picked-spot').innerHTML = `📍 Pinned to your location: ${state.pick.lat}, ${state.pick.lng}`;
-      toast('Location pinned from GPS ✓');
-    },
-    () => toast('Could not read GPS — click the map instead', false),
-  );
-}
-
-/* ------------------------------ data rendering --------------------------- */
-
-async function refreshData() {
-  if (state.loading) return;
-  state.loading = true;
-  try {
-  const dashboard = await getJSON(`${API}/dashboard`);
-  const { zones, incidents, analytics } = dashboard;
-  state.zones = zones; state.reports = incidents; state.analytics = analytics;
-  renderMapZoneInfo();
-
-  // Stat chips
-  $('#stat-total').textContent = incidents.length;
-  if (analytics.total !== incidents.length) console.warn('Incident count mismatch:', { incidents: incidents.length, analytics: analytics.total });
-  $('#stat-zones').textContent = zones.filter((z) => z.count > 0).length;
-  $('#stat-critical').textContent = zones.filter((z) => z.band === 'high' || z.band === 'critical').length;
-  const night = state.reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
-  $('#stat-night').textContent = analytics.total ? Math.round((night / analytics.total) * 100) + '%' : '0%';
-
-  drawZones(); drawMarkers(); drawHeat(); renderZoneList();
-  if (state.tab === 'analytics') requestAnimationFrame(() => drawCharts(analytics));
-  $('#connection').textContent = 'LIVE';
-  $('#connection').className = 'connection live';
-  } catch (err) {
-    $('#connection').textContent = 'OFFLINE';
-    $('#connection').className = 'connection offline';
-    toast(err.message || 'Could not load dashboard.', false);
-  } finally {
-    state.loading = false;
+map.on('click',e=>{
+  if(state.tab!=='report'){
+    const nearest=state.zones.reduce((best,z)=>{
+      const d=map.distance(e.latlng,[z.lat,z.lng]);
+      return !best || d<best.d ? {z,d}:best;
+    },null);
+    if(nearest && nearest.d<1600) openZoneDetail(nearest.z);
+    return;
   }
+  state.pick={lat:+e.latlng.lat.toFixed(5),lng:+e.latlng.lng.toFixed(5)};
+  showPickedSpot();
+});
+
+function showPickedSpot(){
+  const el=$('#picked-spot'); if(!el||!state.pick) return;
+  el.classList.add('set');
+  el.innerHTML=`<span>📍 Pinned: <b>${state.pick.lat}, ${state.pick.lng}</b></span><button type="button" class="mini" id="clear-pick">Clear</button>`;
+  $('#clear-pick').onclick=()=>{state.pick=null;el.classList.remove('set');el.textContent='📍 Click the map to choose a location.';};
+  map.flyTo([state.pick.lat,state.pick.lng],14,{duration:.5});
+}
+function useMyLocation(){
+  if(!navigator.geolocation) return toast('Geolocation is not available.',false);
+  navigator.geolocation.getCurrentPosition(pos=>{
+    state.pick={lat:+pos.coords.latitude.toFixed(5),lng:+pos.coords.longitude.toFixed(5)};
+    showPickedSpot();
+    toast('Location pinned from GPS.');
+  },()=>toast('Could not read GPS. Click the map instead.',false),{enableHighAccuracy:false,timeout:7000});
 }
 
-function renderMapZoneInfo() {
-  const el = $('#map-zone-list');
-  if (!el) return;
-
-  el.innerHTML = state.zones.map((z, i) => `
-    <div class="map-zone-row">
-      <b>${i + 1}</b>
-      <div>
-        <div class="map-zone-name">${esc(z.name)}</div>
-        <div class="map-zone-meta">${z.lat.toFixed(5)}, ${z.lng.toFixed(5)} · ${z.count} reports</div>
-        <div class="map-zone-band">${esc(z.band)}</div>
-      </div>
-      <span class="map-zone-score" style="color:${BAND_COLOR[z.band]}">${z.score}</span>
-    </div>`).join('');
-}
-
-function drawZones() {
+function drawZones(){
   layers.zones.clearLayers();
-  for (const z of state.zones) {
-    L.circle([z.lat, z.lng], {
-      radius: 300 + z.score * 14,       // bigger circle = higher risk
-      color: BAND_COLOR[z.band], weight: 1.5, fillColor: BAND_COLOR[z.band],
-      fillOpacity: 0.14, dashArray: '4 4',
-    })
-      .bindTooltip(`<b>${esc(z.name)}</b> · ${z.score}/100`, {
-        permanent: true,
-        direction: 'center',
-        className: 'zone-label',
-      })
-      .bindPopup(`<b>${esc(z.name)} (${esc(z.np)})</b><br>Risk score: <b style="color:${BAND_COLOR[z.band]}">${z.score}/100 · ${z.band}</b><br>${z.count} reports in 30 days${z.peakHour !== null ? `<br>Peak hour: <b>${z.peakHour}:00</b>` : ''}<br>Click the zone row for more detail.`)
-      .on('click', () => openZoneDetail(z))
-      .addTo(layers.zones);
-  }
-}
-
-function drawMarkers() {
-  layers.markers.clearLayers();
-  // keep the "report pin" if the user had picked one
-  for (const r of state.reports.slice(-160)) {
-    const m = TYPE_META[r.type];
-    L.circleMarker([r.lat, r.lng], {
-      radius: 5, color: '#0b1220', weight: 1, fillColor: m.color, fillOpacity: 0.95,
-    })
-      .bindPopup(`<b>${m.icon} ${m.label}</b><br>Location: ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}<br>${esc(r.note || 'No description')}<br><span class="muted">${timeAgo(r.ts)}</span>`)
-      .on('click', () => openReportDetail(r))
-      .addTo(layers.markers);
-  }
-}
-
-function drawHeat() {
-  layers.heat.clearLayers();
-  // Heatmap is a visual layer; risk scores remain authoritative from /api/risk.
-  const maxSeverity = Math.max(...Object.values(state.types).map((type) => type.severity), 1);
-  const pts = state.reports.map((r) => [r.lat, r.lng, (state.types[r.type]?.severity || 0) / maxSeverity]);
-  if (pts.length) L.heatLayer(pts, {
-    radius: 26, blur: 16, maxZoom: 15, minOpacity: 0.35,
-    gradient: { 0.2: '#1d4ed8', 0.4: '#22c55e', 0.6: '#eab308', 0.8: '#f97316', 1: '#ef4444' },
-  }).addTo(layers.heat);
-}
-
-function renderZoneList() {
-  $('#zone-list').innerHTML = state.zones.filter((z) => z.count > 0)
-    .map((z, i) => `
-      <li class="zone-item" data-z="${i}">
-        <div><b>${i + 1}. ${esc(z.name)}</b> <span class="np-s">${esc(z.np)}</span><br>
-          <small>${z.count} reports · ${z.last24h} today${z.peakHour !== null ? ` · peak ${z.peakHour}:00` : ''}</small></div>
-        <span class="badge ${z.band}">${z.score}</span>
-      </li>`)
-    .join('');
-  $('#zone-list').querySelectorAll('.zone-item').forEach((el) => {
-    el.onclick = () => {
-      const z = state.zones[+el.dataset.z];
-      map.flyTo([z.lat, z.lng], 14);
-    };
+  state.zones.forEach(z=>{
+    const color=BAND_COLOR[z.band]||BAND_COLOR.low;
+    L.circle([z.lat,z.lng],{radius:350+Number(z.score||0)*12,color,weight:2,fillColor:color,fillOpacity:.12,dashArray:'5 5'})
+      .bindTooltip(`<b>${esc(z.name)}</b><br><span>${z.score}/100 · ${esc(z.band)}</span>`,{direction:'top',className:'zone-label'})
+      .on('click',()=>openZoneDetail(z)).addTo(layers.zones);
   });
 }
+function drawMarkers(){
+  layers.markers.clearLayers();
+  state.reports.slice(-180).forEach(r=>{
+    const m=TYPE_META[r.type]||{label:r.type,icon:'•',color:'#94a3b8'};
+    L.circleMarker([r.lat,r.lng],{radius:6,color:'#0b1220',weight:1.5,fillColor:m.color,fillOpacity:.95})
+      .bindTooltip(`${m.icon} ${esc(m.label)} · ${timeAgo(r.ts)}`)
+      .on('click',()=>openReportDetail(r)).addTo(layers.markers);
+  });
+}
+function drawHeat(){
+  layers.heat.clearLayers();
+  const max=Math.max(...Object.values(state.types).map(t=>Number(t.severity)||0),1);
+  const points=state.reports.map(r=>[r.lat,r.lng,(Number(state.types[r.type]?.severity)||0)/max]);
+  if(points.length) L.heatLayer(points,{radius:28,blur:18,maxZoom:15,minOpacity:.34,gradient:{.2:'#1d4ed8',.4:'#22c55e',.6:'#eab308',.8:'#f97316',1:'#ef4444'}}).addTo(layers.heat);
+}
+function renderMapZones(){
+  const el=$('#map-zone-list'); if(!el) return;
+  const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,7);
+  el.innerHTML=zones.map((z,i)=>`<button class="map-zone-row" data-zone="${esc(z.id)}">
+    <span class="rank">${i+1}</span><span><b>${esc(z.name)}</b><small>${z.count} reports · ${z.last24h} today</small></span>
+    <strong style="color:${BAND_COLOR[z.band]}">${z.score}</strong>
+  </button>`).join('');
+  el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));
+}
+function focusZone(id){
+  const z=state.zones.find(x=>x.id===id); if(!z) return;
+  map.flyTo([z.lat,z.lng],14,{duration:.6}); openZoneDetail(z);
+}
+$('#map-reset').onclick=()=>map.setView(defaultView.center,defaultView.zoom,{duration:.5});
 
-function openZoneDetail(z) {
-  $('#detail-title').textContent = z.name;
-  $('#detail-subtitle').textContent = `${z.band.toUpperCase()} RISK · CURRENT SNAPSHOT`;
-  $('#detail-body').innerHTML = `
+function openZoneDetail(z){
+  $('#detail-title').textContent=z.name;
+  $('#detail-subtitle').textContent=`${String(z.band).toUpperCase()} RISK · LIVE BACKEND SNAPSHOT`;
+  $('#detail-body').innerHTML=`
     <div class="detail-grid">
       <div><span>Risk score</span><b style="color:${BAND_COLOR[z.band]}">${z.score}/100</b></div>
       <div><span>Reports · 30d</span><b>${z.count}</b></div>
       <div><span>Last 24h</span><b>${z.last24h}</b></div>
-      <div><span>Peak hour</span><b>${z.peakHour === null ? '—' : String(z.peakHour).padStart(2,'0') + ':00'}</b></div>
+      <div><span>Peak hour</span><b>${z.peakHour===null?'—':String(z.peakHour).padStart(2,'0')+':00'}</b></div>
     </div>
-    <p class="detail-note">This is the live API snapshot used by the dashboard. Click “focus” to center the map on this zone.</p>
-    <button class="btn secondary" id="detail-focus">Focus on map</button>`;
-  $('#detail').classList.add('open');
-  $('#detail-focus').onclick = () => { map.flyTo([z.lat, z.lng], 14); closeDetail(); };
+    <div class="detail-section"><h3>Interpretation</h3><p>This zone is ranked by the same risk model that drives the map, zone list and patrol planner.</p></div>
+    <button class="btn secondary" id="detail-focus">Focus this zone on map</button>`;
+  openDetail();
+  $('#detail-focus').onclick=()=>{map.flyTo([z.lat,z.lng],14,{duration:.6});closeDetail();};
 }
-function openReportDetail(r) {
-  const m = TYPE_META[r.type] || { label: r.type, icon: '•' };
-  const zone = state.zones.find(z => z.id === r.zone);
-  $('#detail-title').textContent = m.label;
-  $('#detail-subtitle').textContent = `INCIDENT · ${timeAgo(r.ts)}`;
-  $('#detail-body').innerHTML = `
+function openReportDetail(r){
+  const m=TYPE_META[r.type]||{label:r.type,icon:'•'};
+  const z=state.zones.find(x=>x.id===r.zone);
+  $('#detail-title').textContent=m.label;
+  $('#detail-subtitle').textContent=`INCIDENT · ${timeAgo(r.ts)}`;
+  $('#detail-body').innerHTML=`
     <div class="detail-grid">
-      <div><span>Zone</span><b>${esc(zone?.name || r.zone)}</b></div>
+      <div><span>Zone</span><b>${esc(z?.name||r.zone)}</b></div>
       <div><span>Type</span><b>${esc(m.label)}</b></div>
       <div><span>Latitude</span><b>${Number(r.lat).toFixed(5)}</b></div>
       <div><span>Longitude</span><b>${Number(r.lng).toFixed(5)}</b></div>
     </div>
-    <p class="detail-note"><strong>Report:</strong> ${esc(r.note || 'No description provided.')}</p>`;
-  $('#detail').classList.add('open');
+    <div class="detail-section"><h3>Report text</h3><p>${esc(r.note||'No description provided.')}</p></div>`;
+  openDetail();
 }
-function openAnalyticsDetail(title, html) {
-  $('#detail-title').textContent = title;
-  $('#detail-subtitle').textContent = 'ANALYTICS DETAIL';
-  $('#detail-body').innerHTML = html;
-  $('#detail').classList.add('open');
+function openAnalyticsDetail(title,html){
+  $('#detail-title').textContent=title; $('#detail-subtitle').textContent='ANALYTICS DETAIL'; $('#detail-body').innerHTML=html; openDetail();
 }
-function closeDetail() { $('#detail').classList.remove('open'); }
+function openDetail(){const d=$('#detail');d.classList.add('open');d.setAttribute('aria-hidden','false');$('#detail-close').focus();}
+function closeDetail(){const d=$('#detail');d.classList.remove('open');d.setAttribute('aria-hidden','true');}
+$('#detail-close').onclick=closeDetail; $('#detail-backdrop').onclick=closeDetail;
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDetail();});
 
-document.addEventListener('click', e => {
-  if (e.target.id === 'detail-close' || e.target.id === 'detail-backdrop') closeDetail();
-});
-window.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
-
-/* --------------------------------- charts -------------------------------- */
-
-function drawCharts(a) {
-  const canvases = ['chart-type', 'chart-hour', 'chart-trend'].map((id) => document.getElementById(id));
-  if (!a || !a.byType || !Array.isArray(a.byHour) || !Array.isArray(a.byDay)) return;
-  drawTypeChart(canvases[0], a.byType);
-  drawHourChart(canvases[1], a.byHour);
-  drawTrendChart(canvases[2], a.byDay);
+/* ------------------------------ charts ---------------------------------- */
+function renderTypeChart(values){
+  const root=$('#chart-type'); if(!root) return;
+  const entries=Object.entries(values||{}).filter(([,v])=>Number(v)>0);
+  const total=entries.reduce((s,[,v])=>s+Number(v),0)||1;
+  let cursor=0;
+  const stops=entries.map(([type,v])=>{const a=cursor/total*360;cursor+=Number(v);return `<button class="donut-segment" data-type="${esc(type)}" style="--start:${a}deg;--end:${cursor/total*360}deg;--color:${TYPE_META[type]?.color||'#64748b'}" aria-label="${esc(TYPE_META[type]?.label||type)}: ${v}"></button>`}).join('');
+  root.innerHTML=`<div class="donut-wrap"><div class="donut">${stops}<div class="donut-hole"><b>${total}</b><span>reports</span></div></div><div class="chart-legend">${entries.map(([type,v])=>`<button data-type="${esc(type)}"><i style="background:${TYPE_META[type]?.color||'#64748b'}"></i><span>${esc(TYPE_META[type]?.label||type)}</span><b>${v}</b></button>`).join('')}</div></div>`;
+  root.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{const type=b.dataset.type,n=Number(values[type]||0);openAnalyticsDetail(TYPE_META[type]?.label||type,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>Share of dashboard records: ${(n/total*100).toFixed(1)}%.</p>`);});
 }
-
-function prepareCanvas(canvas) {
-  const dpr = window.devicePixelRatio || 1;
-  const width = Math.max(260, canvas.clientWidth || canvas.parentElement.clientWidth || 340);
-  const height = 170;
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  canvas.style.width = width + 'px';
-  canvas.style.height = height + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, width, height);
-  return { ctx, width, height };
+function renderHourChart(values){
+  const root=$('#chart-hour'); if(!root) return;
+  const max=Math.max(...values.map(Number),1);
+  root.innerHTML=`<div class="bar-chart">${values.map((v,h)=>`<button class="bar" data-hour="${h}" title="${h}:00 · ${v} records"><span style="height:${Math.max(3,Number(v)/max*100)}%;background:${h>=20||h<4?'#ef4444':'#3b82f6'}"></span><small>${h%3===0?h:''}</small></button>`).join('')}</div>`;
+  root.querySelectorAll('[data-hour]').forEach(b=>b.onclick=()=>{const h=Number(b.dataset.hour),n=Number(values[h]||0);openAnalyticsDetail(`Hour ${String(h).padStart(2,'0')}:00`,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>${h>=20||h<4?'This hour falls inside the dashboard night window (20:00–04:00).':'This hour falls outside the dashboard night window.'}</p>`);});
 }
+function renderTrendChart(values){
+  const root=$('#chart-trend'); if(!root) return;
+  const nums=values.map(d=>Number(d.count)||0),max=Math.max(...nums,1);
+  root.innerHTML=`<div class="trend-chart">${values.map((d,i)=>`<button class="trend-point" data-index="${i}" style="left:${nums.length===1?50:i/(nums.length-1)*100}%;bottom:${nums[i]/max*82+8}%"><span></span></button>`).join('')}<div class="trend-line"></div><div class="axis"><span>older</span><span>today</span></div></div>`;
+  root.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{const d=values[Number(b.dataset.index)];openAnalyticsDetail(`Day ${d.day} of 30`,`<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p>Daily count in the rolling 30-day dashboard snapshot.</p>`);});
+}
+function drawCharts(a){if(!a)return;renderTypeChart(a.byType);renderHourChart(a.byHour);renderTrendChart(a.byDay);}
 
-function drawTypeChart(canvas, values) {
-  canvas._hits = [];
-  const { ctx, width, height } = prepareCanvas(canvas);
-  const entries = Object.entries(values).filter(([, v]) => Number(v) > 0);
-  const total = entries.reduce((s, [, v]) => s + Number(v), 0) || 1;
-  let angle = -Math.PI / 2;
-  const cx = width / 2, cy = 72, radius = 48;
-  entries.forEach(([type, value]) => {
-    const next = angle + (Number(value) / total) * Math.PI * 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius, angle, next);
-    ctx.closePath();
-    ctx.fillStyle = TYPE_META[type]?.color || '#64748b';
-    ctx.fill();
-    canvas._hits.push({ type, start: angle, end: next, cx, cy, radius });
-    angle = next;
-  });
-  ctx.beginPath();
-  ctx.arc(cx, cy, 29, 0, Math.PI * 2);
-  ctx.fillStyle = '#0e1626';
-  ctx.fill();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#e7edf7';
-  ctx.font = '700 15px Segoe UI';
-  ctx.fillText(total, cx, cy + 5);
-  ctx.font = '10px Segoe UI';
-  ctx.fillStyle = '#8ea0bf';
-  ctx.fillText('reports', cx, cy + 20);
-
-  let x = 12, y = 148;
-  entries.forEach(([type, value]) => {
-    const label = TYPE_META[type]?.label || type;
-    ctx.fillStyle = TYPE_META[type]?.color || '#64748b';
-    ctx.fillRect(x, y - 9, 8, 8);
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '10px Segoe UI';
-    ctx.textAlign = 'left';
-    ctx.fillText(label + ': ' + value, x + 12, y);
-    x += Math.min(155, 30 + ctx.measureText(label + ': ' + value).width);
-    if (x > width - 100) { x = 12; y += 15; }
-  });
+/* ------------------------------ overview -------------------------------- */
+function renderOverview(){
+  const high=state.zones.filter(z=>z.band==='high'||z.band==='critical').length;
+  const top=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,5);
+  $('#overview-cards').innerHTML=[
+    ['Total records',state.analytics?.total??state.reports.length,'all records'],
+    ['High-risk zones',high,'high + critical'],
+    ['Last 24h',state.analytics?.last24h??0,'recent records'],
+    ['30-day records',state.analytics?.last30d??0,'model window']
+  ].map(x=>`<button class="overview-card" data-kind="${esc(x[0])}"><span>${esc(x[0])}</span><b>${x[1]}</b><small>${esc(x[2])}</small></button>`).join('');
+  $('#overview-cards').querySelectorAll('.overview-card').forEach((b,i)=>b.onclick=()=>openAnalyticsDetail(['Total records','High-risk zones','Last 24h','30-day records'][i],`<div class="detail-stat"><b>${[['Total records',state.analytics?.total],['High-risk zones',high],['Last 24h',state.analytics?.last24h],['30-day records',state.analytics?.last30d]][i][1]||0}</b><span>current value</span></div><p>This value comes from the same dashboard response used by the map and analytics views.</p>`));
+  $('#overview-zones').innerHTML=top.map(z=>`<button class="mini-zone" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} reports · ${esc(z.band)}</small></span><strong style="color:${BAND_COLOR[z.band]}">${z.score}</strong></button>`).join('');
+  $('#overview-zones').querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));
 }
 
-function drawHourChart(canvas, values) {
-  canvas._hits = [];
-  const { ctx, width, height } = prepareCanvas(canvas);
-  const max = Math.max(...values.map(Number), 1);
-  const left = 28, right = 8, top = 10, bottom = 28;
-  const chartW = width - left - right, chartH = height - top - bottom;
-  ctx.strokeStyle = 'rgba(255,255,255,.07)';
-  ctx.fillStyle = '#8ea0bf';
-  ctx.font = '9px Segoe UI';
-  ctx.textAlign = 'center';
-  for (let i = 0; i < 24; i++) {
-    const x = left + (i + .5) * chartW / 24;
-    const h = Number(values[i] || 0) / max * chartH;
-    ctx.fillStyle = i >= 20 || i < 4 ? '#ef4444' : '#3b82f6';
-    canvas._hits.push({ hour: i, x1: x - 7, x2: x + 7, y1: top + chartH - h, y2: top + chartH });
-    ctx.fillRect(x - 3, top + chartH - h, 6, h);
-    if (i % 3 === 0) {
-      ctx.fillStyle = '#8ea0bf';
-      ctx.fillText(i, x, height - 9);
-    }
-  }
-  ctx.beginPath();
-  ctx.moveTo(left, top + chartH + .5);
-  ctx.lineTo(width - right, top + chartH + .5);
-  ctx.stroke();
+/* ------------------------------ data ------------------------------------ */
+async function refreshData(){
+  if(state.loading)return;
+  state.loading=true;
+  try{
+    const dashboard=await getJSON(`${API}/dashboard`);
+    state.zones=Array.isArray(dashboard.zones)?dashboard.zones:[];
+    state.reports=Array.isArray(dashboard.incidents)?dashboard.incidents:[];
+    state.analytics=dashboard.analytics||null;
+    renderOverview(); renderMapZones(); drawZones(); drawMarkers(); drawHeat(); renderZoneList();
+    if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));
+    $('#connection').textContent='LIVE'; $('#connection').className='connection live';
+  }catch(err){
+    $('#connection').textContent='OFFLINE'; $('#connection').className='connection offline'; toast(err.message||'Could not load dashboard.',false);
+  }finally{state.loading=false;}
+}
+function renderZoneList(){
+  const el=$('#zone-list'); if(!el)return;
+  const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score));
+  el.innerHTML=zones.map(z=>`<li><button class="zone-item" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} reports · ${z.last24h} today · peak ${z.peakHour===null?'—':String(z.peakHour).padStart(2,'0')+':00'}</small></span><strong class="badge ${esc(z.band)}">${z.score}</strong></button></li>`).join('');
+  el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));
+}
+function updateStats(){
+  const a=state.analytics||{}, night=state.reports.filter(r=>{const h=new Date(r.ts).getHours();return h>=20||h<4}).length;
+  $('#stat-total').textContent=state.reports.length;
+  $('#stat-zones').textContent=state.zones.filter(z=>z.count>0).length;
+  $('#stat-critical').textContent=state.zones.filter(z=>z.band==='high'||z.band==='critical').length;
+  $('#stat-night').textContent=state.reports.length?Math.round(night/state.reports.length*100)+'%':'0%';
+  $('#overview-zones').dataset.updated=Date.now();
 }
 
-function drawTrendChart(canvas, values) {
-  canvas._trendPoints = [];
-  const { ctx, width, height } = prepareCanvas(canvas);
-  const nums = values.map((d) => Number(d.count) || 0);
-  const max = Math.max(...nums, 1);
-  const left = 24, right = 10, top = 12, bottom = 25;
-  const chartW = width - left - right, chartH = height - top - bottom;
-  const points = nums.map((v, i) => ({
-    x: left + (nums.length === 1 ? chartW / 2 : i * chartW / (nums.length - 1)),
-    y: top + chartH - (v / max) * chartH,
-  }));
-  ctx.strokeStyle = '#f5a623';
-  ctx.fillStyle = 'rgba(245,166,35,.15)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
-  ctx.stroke();
-  ctx.lineTo(points[points.length - 1].x, top + chartH);
-  ctx.lineTo(points[0].x, top + chartH);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#f5a623';
-  points.forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, Math.PI * 2); ctx.fill(); });
-  ctx.fillStyle = '#8ea0bf';
-  ctx.font = '9px Segoe UI';
-  ctx.textAlign = 'left';
-  ctx.fillText('older', left, height - 8);
-  ctx.textAlign = 'right';
-  ctx.fillText('today', width - right, height - 8);
-  canvas._trendPoints = points.map((p, i) => ({ x: p.x, data: values[i] }));
-}
-
-function chartPoint(canvas, event) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (event.clientX - rect.left) * canvas.width / rect.width / (window.devicePixelRatio || 1),
-    y: (event.clientY - rect.top) * canvas.height / rect.height / (window.devicePixelRatio || 1),
-  };
-}
-function installChartInteractions() {
-  const type = $('#chart-type'), hour = $('#chart-hour'), trend = $('#chart-trend');
-  type.onclick = e => {
-    const p = chartPoint(type, e);
-    const hit = (type._hits || []).find(h => {
-      const a = (Math.atan2(p.y-h.cy, p.x-h.cx) + Math.PI*2) % (Math.PI*2);
-      const s = (h.start + Math.PI*2) % (Math.PI*2), n = (h.end + Math.PI*2) % (Math.PI*2);
-      return Math.hypot(p.x-h.cx, p.y-h.cy) <= h.radius && (s <= n ? a >= s && a <= n : a >= s || a <= n);
-    });
-    if (hit) {
-      const n = state.analytics.byType[hit.type] || 0;
-      openAnalyticsDetail(TYPE_META[hit.type]?.label || hit.type, `<div class="detail-stat"><b>${n}</b><span>records</span></div><p class="detail-note">Share of dashboard records: ${(n / state.analytics.total * 100).toFixed(1)}%.</p>`);
-    }
-  };
-  hour.onclick = e => {
-    const p = chartPoint(hour, e);
-    const hit = (hour._hits || []).find(h => p.x >= h.x1 && p.x <= h.x2 && p.y >= h.y1 && p.y <= h.y2);
-    if (hit) openAnalyticsDetail(`Hour ${String(hit.hour).padStart(2,'0')}:00`, `<div class="detail-stat"><b>${state.analytics.byHour[hit.hour] || 0}</b><span>records</span></div><p class="detail-note">${hit.hour >= 20 || hit.hour < 4 ? 'Inside the dashboard night window (20:00–04:00).' : 'Outside the dashboard night window.'}</p>`);
-  };
-  trend.onclick = e => {
-    const p = chartPoint(trend, e), pts = trend._trendPoints || [];
-    if (!pts.length) return;
-    const hit = pts.reduce((best, q, i) => Math.abs(q.x-p.x) < Math.abs(pts[best].x-p.x) ? i : best, 0);
-    const d = pts[hit].data;
-    openAnalyticsDetail(`Day ${d.day} of 30`, `<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p class="detail-note">Daily count in the rolling 30-day dashboard snapshot.</p>`);
-  };
-  [type,hour,trend].forEach(c => c.onmouseenter = () => c.style.cursor = 'pointer');
-}
-installChartInteractions();
-
-/* ------------------------------ interactions ----------------------------- */
-
-// Tab switching
-$('#tabs').addEventListener('click', (e) => {
-  const btn = e.target.closest('.tab'); if (!btn) return;
-  state.tab = btn.dataset.tab;
-  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === btn));
-  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${state.tab}`));
-  document.querySelector('#panel').scrollTop = 0;
+/* ------------------------------ navigation ------------------------------- */
+function setTab(tab){
+  state.tab=tab;
+  $$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  $$('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${tab}`));
+  $('#panel').scrollTop=0;
   map.invalidateSize();
-  layers.route.clearLayers();
-  if (state.tab === 'analytics' && state.analytics) {
-    requestAnimationFrame(() => drawCharts(state.analytics));
-  }
-});
+  if(tab==='analytics'&&state.analytics)requestAnimationFrame(()=>drawCharts(state.analytics));
+  if(tab==='report')$('#map-mode').textContent='Click anywhere on the map to pin an anonymous report.';
+  else $('#map-mode').textContent='Click a zone or incident marker to open more information.';
+}
+$('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(b)setTab(b.dataset.tab);};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)setTab(b.dataset.go);});
+$$('[data-stat]').forEach(b=>b.onclick=()=>setTab(b.dataset.stat==='total'?'overview':b.dataset.stat==='night'?'analytics':'risk'));
 
-// Anonymous report submission
-$('#report-form').addEventListener('submit', async (e) => {
+/* ------------------------------ reporting -------------------------------- */
+$('#report-form').onsubmit=async e=>{
   e.preventDefault();
-  if (!state.pick) return toast('Please click the map to pin the location first', false);
-  const body = {
-    type: $('#f-type').value, when: $('#f-when').value,
-    note: $('#f-note').value.trim(), lat: state.pick.lat, lng: state.pick.lng,
-  };
-  try {
-    const res = await fetch(`${API}/incidents`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
-    toast('✓ Reported anonymously');
-    $('#f-note').value = ''; state.pick = null;
-    $('#picked-spot').classList.remove('set');
-    $('#picked-spot').textContent = '📍 No location picked yet — click anywhere on the map';
-    refreshData();
-  } catch (err) { toast(err.message, false); }
-});
+  if(!state.pick)return toast('Pick a location on the map first.',false);
+  const button=e.submitter;button.disabled=true;button.textContent='Submitting…';
+  try{
+    await getJSON(`${API}/incidents`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:$('#f-type').value,when:$('#f-when').value,note:$('#f-note').value.trim(),lat:state.pick.lat,lng:state.pick.lng})});
+    $('#f-note').value='';state.pick=null;$('#picked-spot').classList.remove('set');$('#picked-spot').textContent='📍 Click the map to choose a location.';
+    toast('Report submitted anonymously.');await refreshData();
+  }catch(err){toast(err.message,false);}finally{button.disabled=false;button.textContent='Submit anonymous report';}
+};
 
-// Layer toggles
-$('#toggle-heat').onchange = (e) => (e.target.checked ? layers.heat.addTo(map) : map.removeLayer(layers.heat));
-$('#toggle-markers').onchange = (e) => (e.target.checked ? layers.markers.addTo(map) : map.removeLayer(layers.markers));
+/* ------------------------------ layers ----------------------------------- */
+$('#toggle-heat').onchange=e=>e.target.checked?layers.heat.addTo(map):map.removeLayer(layers.heat);
+$('#toggle-markers').onchange=e=>e.target.checked?layers.markers.addTo(map):map.removeLayer(layers.markers);
 
-/* --------------------------- patrol & allocation ------------------------- */
-
-$('#p-generate').addEventListener('click', async () => {
-  const button = $('#p-generate');
-  button.disabled = true; button.textContent = 'Generating…';
-  try {
-  const station = encodeURIComponent($('#p-station').value);
-  const stops = $('#p-stops').value;
-  const officers = Math.max(2, Math.min(40, +$('#p-officers').value || 12));
-
-  const [route, alloc] = await Promise.all([
-    getJSON(`${API}/patrol?station=${station}&stops=${stops}`),
-    getJSON(`${API}/allocation?officers=${officers}`),
-  ]);
-  drawRoute(route, alloc);
-  } catch (err) { toast(err.message || 'Could not generate patrol plan.', false); }
-  finally { button.disabled = false; button.textContent = 'Generate patrol plan'; }
-});
-
-function drawRoute(route, alloc) {
+/* ------------------------------ patrol ----------------------------------- */
+$('#p-generate').onclick=async()=>{
+  const button=$('#p-generate');button.disabled=true;button.textContent='Generating…';
+  try{
+    const station=encodeURIComponent($('#p-station').value),stops=clamp(Number($('#p-stops').value)||5,1,10),officers=clamp(Number($('#p-officers').value)||12,2,40);
+    const [route,alloc]=await Promise.all([getJSON(`${API}/patrol?station=${station}&stops=${stops}`),getJSON(`${API}/allocation?officers=${officers}`)]);
+    drawRoute(route,alloc);
+  }catch(err){toast(err.message||'Could not generate patrol plan.',false);}finally{button.disabled=false;button.textContent='Generate patrol plan';}
+};
+function drawRoute(route,alloc){
   layers.route.clearLayers();
-  const pts = [{ lat: route.station.lat, lng: route.station.lng }, ...route.stops];
-
-  // station marker
-  L.marker([route.station.lat, route.station.lng], {
-    icon: L.divIcon({ className: 'station-pin', html: '🚔', iconSize: [30, 30] }),
-  }).bindTooltip(route.station.name).addTo(layers.route);
-
-  // route polyline
-  L.polyline(pts.map((p) => [p.lat, p.lng]), {
-    color: '#f5a623', weight: 3.5, dashArray: '10 8', opacity: 0.95,
-  }).addTo(layers.route);
-
-  // numbered stop markers
-  route.stops.forEach((s, i) => {
-    L.marker([s.lat, s.lng], {
-      icon: L.divIcon({ className: 'stop-pin', html: `<b>${i + 1}</b>`, iconSize: [26, 26] }),
-    }).bindPopup(`<b>Stop ${i + 1}: ${esc(s.name)}</b><br>Risk ${s.score}/100 · ${s.band}<br>Leg: ${s.legKm} km from previous stop`)
-      .addTo(layers.route);
-  });
-
-  map.fitBounds(L.latLngBounds(pts.map((p) => [p.lat, p.lng])).pad(0.25));
-
-  // route summary card
+  const pts=[{lat:route.station.lat,lng:route.station.lng},...route.stops];
+  L.marker([route.station.lat,route.station.lng],{icon:L.divIcon({className:'station-pin',html:'🚔',iconSize:[30,30]})}).bindTooltip(route.station.name).addTo(layers.route);
+  L.polyline(pts.map(p=>[p.lat,p.lng]),{color:'#f5a623',weight:4,dashArray:'10 8',opacity:.95}).addTo(layers.route);
+  route.stops.forEach((s,i)=>L.marker([s.lat,s.lng],{icon:L.divIcon({className:'stop-pin',html:`<b>${i+1}</b>`,iconSize:[26,26]})}).on('click',()=>openAnalyticsDetail(`Patrol stop ${i+1}: ${s.name}`,`<div class="detail-grid"><div><span>Risk</span><b>${s.score}/100</b></div><div><span>Band</span><b>${esc(s.band)}</b></div><div><span>Leg</span><b>${s.legKm} km</b></div><div><span>Zone</span><b>${esc(s.name)}</b></div></div>`)).addTo(layers.route));
+  map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])).pad(.25));
   $('#route-card').classList.remove('hidden');
-  $('#route-card').innerHTML = `
-    <h3>🚔 Route · ${esc(route.station.name.split('(')[0])}</h3>
-    <ol>${route.stops.map((s, i) => `<li><b>${esc(s.name)}</b> — risk <span class="badge ${s.band}">${s.score}</span> <small>(+${s.legKm} km)</small></li>`).join('')}</ol>
-    <div class="route-meta">📏 ${route.totalKm} km &nbsp;·&nbsp; ⏱️ ~${route.totalMin} min incl. 10 min/stop</div>`;
-
-  // allocation table
+  $('#route-card').innerHTML=`<div class="result-heading"><h3>🚔 Route from ${esc(route.station.name)}</h3><button class="ghost-btn" id="route-focus">Focus route</button></div><ol>${route.stops.map((s,i)=>`<li><button class="route-stop" data-stop="${i}"><b>${esc(s.name)}</b><span>risk ${s.score} · +${s.legKm} km</span></button></li>`).join('')}</ol><div class="route-meta">📏 ${route.totalKm} km · ⏱ ~${route.totalMin} min including stops</div>`;
   $('#alloc-card').classList.remove('hidden');
-  $('#alloc-card').innerHTML = `
-    <h3>👮 Officer allocation (${alloc.officers} on duty)</h3>
-    <table><thead><tr><th>Zone</th><th>Officers</th><th>Window</th></tr></thead>
-    <tbody>${alloc.zones.map((z) => `
-      <tr><td>${esc(z.name)}</td><td><b>${z.officers}</b></td><td>${z.window}</td></tr>`).join('')}
-    </tbody></table>
-    <p class="muted small">Proportional to live risk score; windows follow each zone's peak incident hour.</p>`;
-  toast('Patrol plan generated ✓');
+  $('#alloc-card').innerHTML=`<div class="result-heading"><h3>👮 Officer allocation</h3><span class="result-pill">${alloc.officers} on duty</span></div><div class="allocation-list">${alloc.zones.map(z=>`<button class="allocation-row" data-zone="${esc(z.id||z.name)}"><span><b>${esc(z.name)}</b><small>${esc(z.window)}</small></span><strong>${z.officers}</strong></button>`).join('')}</div><p class="muted small">Allocation is proportional to the current risk score and uses the same zone model as the map.</p>`;
+  $('#route-focus').onclick=()=>map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])).pad(.25));
+  $('#route-card').querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>map.flyTo([route.stops[Number(b.dataset.stop)].lat,route.stops[Number(b.dataset.stop)].lng],14,{duration:.5}));
+  $('#alloc-card').querySelectorAll('[data-zone]').forEach(b=>{b.onclick=()=>{const z=state.zones.find(x=>x.id===b.dataset.zone||x.name===b.dataset.zone);if(z)openZoneDetail(z);};});
+  toast('Patrol plan generated.');
 }
 
-/* ---------------------------------- boot --------------------------------- */
-
-(async function boot() {
-  const meta = await getJSON(`${API}/config`);
-  state.types = meta.types;
-  $('#p-station').innerHTML = meta.stations
-    .map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
-  await refreshData();
-  setInterval(refreshData, 60_000);
-  window.addEventListener('resize', () => { if (state.tab === 'analytics') requestAnimationFrame(() => drawCharts(state.analytics)); });
+/* ------------------------------ boot ------------------------------------- */
+(async function boot(){
+  try{
+    const meta=await getJSON(`${API}/config`);
+    state.types=meta.types||{};
+    $('#p-station').innerHTML=(meta.stations||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+    await refreshData(); updateStats(); setTab('overview');
+    useMyLocation._available=!!navigator.geolocation;
+    setInterval(async()=>{await refreshData();updateStats();},60000);
+    window.addEventListener('resize',()=>{map.invalidateSize();if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));});
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshData();updateStats();}});
+    $('#picked-spot').addEventListener('dblclick',useMyLocation);
+  }catch(err){toast(err.message||'Application failed to initialise.',false);}
 })();

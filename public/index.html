@@ -3,133 +3,141 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SurakshyaPath · सुरक्षापथ — Data-Driven Incident Analysis</title>
-  <meta name="description" content="Experimental incident analysis, risk modelling, patrol routing, and resource allocation." />
-
-  <!-- Map + charts libraries (CDN, no API keys needed) -->
+  <title>SurakshyaPath · सुरक्षापथ</title>
+  <meta name="description" content="SurakshyaPath is an experimental dashboard for incident analysis, risk modelling, patrol routing and resource planning." />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
-
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-  <!-- ======================= HEADER ======================= -->
-  <header>
+  <header class="app-header">
     <div class="brand">
       <div class="logo">🛡️</div>
       <div>
-        <h1>SurakshyaPath <span class="np">सुरक्षापथ</span></h1>
-        <p>Experimental incident analysis and resource planning</p>
+        <h1>SurakshyaPath <span>सुरक्षापथ</span></h1>
+        <p>Experimental incident analysis &amp; resource planning</p>
       </div>
     </div>
-    <nav id="tabs">
-      <button class="tab active" data-tab="report">📝 Report</button>
-      <button class="tab" data-tab="risk">🔥 Risk Map</button>
-      <button class="tab" data-tab="patrol">🚔 Patrol &amp; Resources</button>
-      <button class="tab" data-tab="analytics">📊 Analytics</button>
-    </nav>
+    <div class="header-meta">
+      <span id="connection" class="connection pending">CONNECTING</span>
+      <span class="data-note">Synthetic research dataset</span>
+    </div>
   </header>
 
-  <!-- ======================= STATS BAR ======================= -->
-  <section class="stats-bar">
-    <div class="stat"><span id="stat-total" class="num">—</span><label>Research records</label></div>
-    <div class="stat"><span id="stat-zones" class="num">—</span><label>Active zones</label></div>
-    <div class="stat"><span id="stat-critical" class="num">—</span><label>High-risk zones</label></div>
-    <div class="stat"><span id="stat-night" class="num">—</span><label>% at night (8pm–4am)</label></div>
+  <nav id="tabs" class="tabs" aria-label="Dashboard sections">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="report">Report</button>
+    <button class="tab" data-tab="risk">Risk map</button>
+    <button class="tab" data-tab="patrol">Patrol</button>
+    <button class="tab" data-tab="analytics">Analytics</button>
+  </nav>
+
+  <section class="stats-bar" aria-label="Dashboard summary">
+    <button class="stat stat-click" data-stat="total"><span id="stat-total" class="num">—</span><span><b>Research records</b><small>all dashboard incidents</small></span></button>
+    <button class="stat stat-click" data-stat="zones"><span id="stat-zones" class="num">—</span><span><b>Active zones</b><small>zones with reports</small></span></button>
+    <button class="stat stat-click" data-stat="critical"><span id="stat-critical" class="num">—</span><span><b>High-risk zones</b><small>high + critical bands</small></span></button>
+    <button class="stat stat-click" data-stat="night"><span id="stat-night" class="num">—</span><span><b>Night share</b><small>20:00–04:00 local time</small></span></button>
   </section>
 
-  <!-- ======================= MAIN LAYOUT ======================= -->
-  <main class="layout">
-    <div id="map">
-      <div id="map-zone-info" class="map-zone-info">
-        <div class="map-zone-title">Risk zones</div>
-        <div id="map-zone-list">Loading zones…</div>
+  <main class="workspace">
+    <section id="map-shell" class="map-shell">
+      <div id="map"></div>
+      <div class="map-hud">
+        <div>
+          <strong>Risk intelligence map</strong>
+          <span id="map-mode">Select a zone, marker or heat area for more context.</span>
+        </div>
+        <button id="map-reset" class="icon-btn" type="button">Reset view</button>
       </div>
-    </div>
+      <div id="map-zone-info" class="map-zone-info">
+        <div class="map-zone-title">Top risk zones</div>
+        <div id="map-zone-list">Loading…</div>
+      </div>
+    </section>
 
-    <aside id="panel">
-      <!-- ---------- TAB 1: Anonymous reporting ---------- -->
-      <section id="panel-report" class="panel active">
-        <h2>Report anonymously</h2>
-        <p class="muted">No name. No login. No phone number. Your report helps the whole community — <strong>click the map</strong> to pin the location.</p>
-        <div id="picked-spot" class="picked muted">📍 No location picked yet — click anywhere on the map</div>
+    <aside id="panel" class="side-panel">
+      <section id="panel-overview" class="panel active">
+        <div class="panel-heading">
+          <div><span class="eyebrow">Command center</span><h2>What is happening?</h2></div>
+          <button class="ghost-btn" data-go="analytics">Open analytics →</button>
+        </div>
+        <p class="muted">Everything on this dashboard is connected to the same backend snapshot. Click any card, zone, marker or chart element to drill into the data behind it.</p>
+        <div id="overview-cards" class="overview-cards"></div>
+        <div class="section-title">Live risk snapshot</div>
+        <div id="overview-zones" class="mini-zone-list"></div>
+        <div class="tip-card"><b>How to explore</b><span>Use the map for spatial detail, Analytics for patterns, and Patrol for a reproducible response plan.</span></div>
+      </section>
+
+      <section id="panel-report" class="panel">
+        <div class="panel-heading"><div><span class="eyebrow">Community input</span><h2>Report anonymously</h2></div></div>
+        <p class="muted">Choose a point on the map, describe the incident, and submit it without an identity field.</p>
+        <div id="picked-spot" class="picked">📍 Click the map to choose a location.</div>
         <form id="report-form">
-          <label>What happened?</label>
+          <label for="f-type">What happened?</label>
           <select id="f-type" required>
-            <option value="theft">💼 Theft / Pickpocketing (चोरी)</option>
-            <option value="suspicious">🕵️ Suspicious Activity (संदिग्ध गतिविधि)</option>
-            <option value="harassment">🆘 Harassment (उत्पीडन)</option>
-            <option value="infrastructure">⚠️ Infrastructure Issue (पूर्वाधार)</option>
+            <option value="theft">Theft / Pickpocketing</option>
+            <option value="suspicious">Suspicious Activity</option>
+            <option value="harassment">Harassment</option>
+            <option value="infrastructure">Infrastructure Issue</option>
           </select>
-          <label>When?</label>
+          <label for="f-when">When?</label>
           <select id="f-when">
             <option value="now">Just now</option>
             <option value="today">Earlier today</option>
             <option value="week">Within the past week</option>
           </select>
-          <label>Details (optional)</label>
-          <textarea id="f-note" maxlength="280" rows="3" placeholder="e.g. Street light broken near the chowk, area is fully dark after 8pm"></textarea>
+          <label for="f-note">Details <span>(optional)</span></label>
+          <textarea id="f-note" maxlength="280" rows="4" placeholder="Short factual description…"></textarea>
           <button type="submit" class="btn primary">Submit anonymous report</button>
         </form>
-        <div class="privacy-card">🔒 <strong>Privacy by design:</strong> SurakshyaPath never asks who you are. Reports are stored without any identity.</div>
+        <div class="privacy-card">🔒 <b>Privacy by design</b><span>No name, phone number or login is collected by this interface.</span></div>
       </section>
 
-      <!-- ---------- TAB 2: Risk zones ---------- -->
       <section id="panel-risk" class="panel">
-        <h2>Dynamic risk zones</h2>
-        <p class="muted">Baseline risk uses <strong>severity × recency</strong>. Spatial research records are synthetic and used for algorithm testing.</p>
-        <div class="legend">
-          <span><i class="dot low"></i>Low</span><span><i class="dot moderate"></i>Moderate</span>
-          <span><i class="dot high"></i>High</span><span><i class="dot critical"></i>Critical</span>
-        </div>
-        <div class="check"><input type="checkbox" id="toggle-heat" checked /> <label for="toggle-heat">Heatmap layer</label></div>
-        <div class="check"><input type="checkbox" id="toggle-markers" checked /> <label for="toggle-markers">Incident markers</label></div>
+        <div class="panel-heading"><div><span class="eyebrow">Spatial model</span><h2>Dynamic risk zones</h2></div></div>
+        <p class="muted">Risk is calculated by the backend model from severity and recency. Spatial records are synthetic for algorithm testing.</p>
+        <div class="legend"><span><i class="dot low"></i>Low</span><span><i class="dot moderate"></i>Moderate</span><span><i class="dot high"></i>High</span><span><i class="dot critical"></i>Critical</span></div>
+        <div class="toggle-row"><label><input type="checkbox" id="toggle-heat" checked /> Heatmap</label><label><input type="checkbox" id="toggle-markers" checked /> Incidents</label></div>
+        <div class="section-title">All zones</div>
         <ul id="zone-list" class="zone-list"></ul>
       </section>
 
-      <!-- ---------- TAB 3: Patrol & resources ---------- -->
       <section id="panel-patrol" class="panel">
-        <h2>Patrol planner</h2>
-        <p class="muted">Optimal route through the highest-risk zones from your station (nearest-neighbour optimisation).</p>
-        <label>Station</label>
-        <select id="p-station"></select>
-        <label>Patrol stops</label>
-        <select id="p-stops">
-          <option value="3">Top 3 zones</option>
-          <option value="5" selected>Top 5 zones</option>
-          <option value="7">Top 7 zones</option>
-        </select>
-        <label>Officers on duty</label>
-        <input type="number" id="p-officers" min="2" max="40" value="12" />
+        <div class="panel-heading"><div><span class="eyebrow">Operations model</span><h2>Patrol planner</h2></div></div>
+        <p class="muted">Generate a deterministic route through the highest-risk zones and allocate available officers proportionally to current risk.</p>
+        <label for="p-station">Station</label><select id="p-station"></select>
+        <label for="p-stops">Patrol stops</label><select id="p-stops"><option value="3">Top 3 zones</option><option value="5" selected>Top 5 zones</option><option value="7">Top 7 zones</option></select>
+        <label for="p-officers">Officers on duty</label><input type="number" id="p-officers" min="2" max="40" value="12" />
         <button id="p-generate" class="btn primary">Generate patrol plan</button>
         <div id="route-card" class="route-card hidden"></div>
         <div id="alloc-card" class="alloc-card hidden"></div>
       </section>
 
-      <!-- ---------- TAB 4: Analytics ---------- -->
       <section id="panel-analytics" class="panel">
-        <h2>Timing &amp; frequency analysis</h2>
-        <p class="muted">When and what the municipality should plan for.</p>
-        <div class="chart-box"><h3>Incidents by type</h3><canvas id="chart-type"></canvas></div>
-        <div class="chart-box"><h3>Hour of day <span class="hint">(peak risk window)</span></h3><canvas id="chart-hour"></canvas></div>
-        <div class="chart-box"><h3>Last 14 days</h3><canvas id="chart-trend"></canvas></div>
+        <div class="panel-heading"><div><span class="eyebrow">Research view</span><h2>Timing &amp; frequency</h2></div></div>
+        <p class="muted">Charts are interactive. Click a segment, hour, or day to open the underlying metric.</p>
+        <div class="chart-box"><div class="chart-title"><h3>Incidents by type</h3><span>Click a segment</span></div><div id="chart-type" class="chart" role="img" aria-label="Incidents by type"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Hour of day</h3><span>Click a bar</span></div><div id="chart-hour" class="chart" role="img" aria-label="Incidents by hour"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Last 30 days</h3><span>Click a day</span></div><div id="chart-trend" class="chart" role="img" aria-label="Incidents over the last 30 days"></div></div>
       </section>
     </aside>
   </main>
+
   <div id="detail" class="detail" aria-hidden="true">
     <div id="detail-backdrop" class="detail-backdrop"></div>
     <section class="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title">
-      <button id="detail-close" class="detail-close" aria-label="Close">✕</button>
-      <h2 id="detail-title">Details</h2><div id="detail-subtitle" class="detail-subtitle"></div><div id="detail-body"></div>
+      <button id="detail-close" class="detail-close" aria-label="Close details">✕</button>
+      <span class="eyebrow">Data detail</span>
+      <h2 id="detail-title">Details</h2>
+      <div id="detail-subtitle" class="detail-subtitle"></div>
+      <div id="detail-body"></div>
     </section>
   </div>
 
-  <footer>
-    SurakshyaPath · Experimental data-driven incident analysis · Synthetic spatial dataset for algorithm testing
-  </footer>
-
-  <div id="toast" class="toast"></div>
+  <footer>SurakshyaPath · experimental dashboard · synthetic spatial dataset · research prototype</footer>
+  <div id="toast" class="toast" aria-live="polite"></div>
   <script src="js/app.js"></script>
 </body>
 </html>
