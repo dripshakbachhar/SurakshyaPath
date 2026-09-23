@@ -312,6 +312,7 @@ $('#tabs').addEventListener('click', (e) => {
   state.tab = btn.dataset.tab;
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t === btn));
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${state.tab}`));
+  document.querySelector('#panel').scrollTop = 0;
   map.invalidateSize();
   layers.route.clearLayers();
   if (state.tab === 'analytics' && state.analytics) {
