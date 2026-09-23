@@ -101,7 +101,7 @@ async function refreshData() {
   if (analytics.total !== incidents.length) console.warn('Incident count mismatch:', { incidents: incidents.length, analytics: analytics.total });
   $('#stat-zones').textContent = zones.filter((z) => z.count > 0).length;
   $('#stat-critical').textContent = zones.filter((z) => z.band === 'high' || z.band === 'critical').length;
-  const night = reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
+  const night = state.reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
   $('#stat-night').textContent = analytics.total ? Math.round((night / analytics.total) * 100) + '%' : '0%';
 
   drawZones(); drawMarkers(); drawHeat(); renderZoneList(); drawCharts(analytics);
