@@ -94,6 +94,7 @@ async function refreshData() {
   const dashboard = await getJSON(`${API}/dashboard`);
   const { zones, incidents, analytics } = dashboard;
   state.zones = zones; state.reports = incidents;
+  renderMapZoneInfo();
 
   // Stat chips
   $('#stat-total').textContent = incidents.length;
@@ -104,6 +105,22 @@ async function refreshData() {
   $('#stat-night').textContent = analytics.total ? Math.round((night / analytics.total) * 100) + '%' : '0%';
 
   drawZones(); drawMarkers(); drawHeat(); renderZoneList(); drawCharts(analytics);
+}
+
+function renderMapZoneInfo() {
+  const el = $('#map-zone-list');
+  if (!el) return;
+
+  el.innerHTML = state.zones.map((z, i) => `
+    <div class="map-zone-row">
+      <b>${i + 1}</b>
+      <div>
+        <div class="map-zone-name">${esc(z.name)}</div>
+        <div class="map-zone-meta">${z.lat.toFixed(5)}, ${z.lng.toFixed(5)} · ${z.count} reports</div>
+        <div class="map-zone-band">${esc(z.band)}</div>
+      </div>
+      <span class="map-zone-score" style="color:${BAND_COLOR[z.band]}">${z.score}</span>
+    </div>`).join('');
 }
 
 function drawZones() {
