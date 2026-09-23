@@ -34,7 +34,6 @@ function toast(msg, ok = true) {
 }
 
 const getJSON = async (url) => (await fetch(url)).json();
-const decayOf = (ts) => Math.max(0.15, 1 - (Date.now() - ts) / (30 * DAY_MS));
 const timeAgo = (ts) => {
   const h = Math.floor((Date.now() - ts) / 3600e3);
   return h < 1 ? 'just now' : h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
@@ -135,8 +134,8 @@ function drawMarkers() {
 
 function drawHeat() {
   layers.heat.clearLayers();
-  // weight each point by severity × recency decay — same idea as the backend score
-  const pts = state.reports.map((r) => [r.lat, r.lng, TYPE_META[r.type] ? 0.4 + 0.6 * decayOf(r.ts) : 0.5]);
+  // Heatmap is a visual layer; risk scores remain authoritative from /api/risk.
+  const pts = state.reports.map((r) => [r.lat, r.lng, TYPE_META[r.type]?.severity ? TYPE_META[r.type].severity / 7 : 0.5]);
   if (pts.length) L.heatLayer(pts, {
     radius: 26, blur: 16, maxZoom: 15, minOpacity: 0.35,
     gradient: { 0.2: '#1d4ed8', 0.4: '#22c55e', 0.6: '#eab308', 0.8: '#f97316', 1: '#ef4444' },
