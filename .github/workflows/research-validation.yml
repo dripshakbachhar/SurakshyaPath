@@ -1,0 +1,37 @@
+name: Research validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research-validation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run reproducible research pipeline
+        run: npm run research
+
+      - name: Generate research figures
+        run: npm run figures
+
+      - name: Validate deterministic outputs
+        run: npm run validate
