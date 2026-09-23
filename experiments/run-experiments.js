@@ -9,18 +9,8 @@ if (!fs.existsSync(input)) {
   require("../data/generate-synthetic");
 }
 
-const zones = [
-  ["Thamel", 27.715, 85.312],
-  ["Kalimati", 27.700, 85.283],
-  ["New Baneshwor", 27.691, 85.342],
-  ["Chabahil", 27.718, 85.347],
-  ["Koteshwor", 27.678, 85.347],
-  ["Balaju", 27.735, 85.291],
-  ["Patan", 27.676, 85.325],
-  ["Gongabu", 27.735, 85.312],
-  ["Kirtipur", 27.678, 85.277],
-  ["Bouddha", 27.721, 85.362]
-];
+const { ZONES } = require("../config/zones");
+const zones = ZONES.map(z => [z.name, z.lat, z.lng]);
 
 function parseCsv(text) {
   const lines = text.trim().split(/\r?\n/);
