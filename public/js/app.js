@@ -17,7 +17,7 @@ const TYPE_META = {
 const BAND_COLOR = { low: '#22c55e', moderate: '#eab308', high: '#f97316', critical: '#ef4444' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const state = { reports: [], zones: [], types: {}, pick: null, tab: 'report' };
+const state = { reports: [], zones: [], types: {}, analytics: null, pick: null, tab: 'report' };
 
 /* --------------------------------- helpers ------------------------------- */
 
@@ -93,7 +93,7 @@ function useMyLocation() {
 async function refreshData() {
   const dashboard = await getJSON(`${API}/dashboard`);
   const { zones, incidents, analytics } = dashboard;
-  state.zones = zones; state.reports = incidents;
+  state.zones = zones; state.reports = incidents; state.analytics = analytics;
   renderMapZoneInfo();
 
   // Stat chips
@@ -104,7 +104,8 @@ async function refreshData() {
   const night = state.reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
   $('#stat-night').textContent = analytics.total ? Math.round((night / analytics.total) * 100) + '%' : '0%';
 
-  drawZones(); drawMarkers(); drawHeat(); renderZoneList(); drawCharts(analytics);
+  drawZones(); drawMarkers(); drawHeat(); renderZoneList();
+  if (state.tab === 'analytics') drawCharts(analytics);
 }
 
 function renderMapZoneInfo() {
@@ -226,6 +227,9 @@ $('#tabs').addEventListener('click', (e) => {
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === `panel-${state.tab}`));
   map.invalidateSize();
   layers.route.clearLayers();
+  if (state.tab === 'analytics' && state.analytics) {
+    requestAnimationFrame(() => drawCharts(state.analytics));
+  }
 });
 
 // Anonymous report submission
