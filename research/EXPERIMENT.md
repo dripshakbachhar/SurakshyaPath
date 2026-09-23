@@ -165,7 +165,7 @@ For each seed and model, the experiment records:
 
 The results are stored under `experiments/results/robustness/`.
 
-These seed variations are **synthetic scenario replications**, not independent real-world observations. They are intended to test algorithmic sensitivity and robustness, not to justify population-level statistical inference or claims about actual crime patterns. Replication is useful for examining stability and potential moderators in empirical software-engineering research. citeturn0search0
+These seed variations are **synthetic scenario replications**, not independent real-world observations. They are intended to test algorithmic sensitivity and robustness, not to justify population-level statistical inference or claims about actual crime patterns. Replication is useful for examining stability and potential moderators in empirical software-engineering research.
 
 ## 11. Reproducibility procedure
 
