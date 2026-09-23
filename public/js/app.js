@@ -149,9 +149,20 @@ function renderTypeChart(values){
   const entries=Object.entries(values||{}).filter(([,v])=>Number(v)>0);
   const total=entries.reduce((s,[,v])=>s+Number(v),0)||1;
   let cursor=0;
-  const stops=entries.map(([type,v])=>{const a=cursor/total*360;cursor+=Number(v);return `<button class="donut-segment" data-type="${esc(type)}" style="--start:${a}deg;--end:${cursor/total*360}deg;--color:${TYPE_META[type]?.color||'#64748b'}" aria-label="${esc(TYPE_META[type]?.label||type)}: ${v}"></button>`}).join('');
-  root.innerHTML=`<div class="donut-wrap"><div class="donut">${stops}<div class="donut-hole"><b>${total}</b><span>reports</span></div></div><div class="chart-legend">${entries.map(([type,v])=>`<button data-type="${esc(type)}"><i style="background:${TYPE_META[type]?.color||'#64748b'}"></i><span>${esc(TYPE_META[type]?.label||type)}</span><b>${v}</b></button>`).join('')}</div></div>`;
-  root.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{const type=b.dataset.type,n=Number(values[type]||0);openAnalyticsDetail(TYPE_META[type]?.label||type,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>Share of dashboard records: ${(n/total*100).toFixed(1)}%.</p>`);});
+  const segments=entries.map(([type,v])=>{
+    const share=Number(v)/total;
+    const dash=share*100;
+    const offset=-(cursor/total*100);
+    cursor+=Number(v);
+    return {type,value:Number(v),dash,offset};
+  });
+  const circles=segments.map((s,i)=>`<circle class="donut-ring" data-type="${esc(s.type)}" cx="70" cy="70" r="50" pathLength="100" stroke="${TYPE_META[s.type]?.color||'#64748b'}" stroke-width="18" stroke-dasharray="${s.dash} ${100-s.dash}" stroke-dashoffset="${s.offset}" aria-label="${esc(TYPE_META[s.type]?.label||s.type)}: ${s.value}" tabindex="0"></circle>`).join('');
+  root.innerHTML=`<div class="donut-wrap"><div class="donut-svg"><svg viewBox="0 0 140 140" role="img" aria-label="Incidents by type">${circles}</svg><div class="donut-hole"><b>${total}</b><span>reports</span></div></div><div class="chart-legend">${segments.map(s=>`<button data-type="${esc(s.type)}"><i style="background:${TYPE_META[s.type]?.color||'#64748b'}"></i><span>${esc(TYPE_META[s.type]?.label||s.type)}</span><b>${s.value}</b></button>`).join('')}</div></div>`;
+  const openType=type=>{
+    const n=Number(values[type]||0);
+    openAnalyticsDetail(TYPE_META[type]?.label||type,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>Share of dashboard records: ${(n/total*100).toFixed(1)}%.</p>`);
+  };
+  root.querySelectorAll('[data-type]').forEach(b=>{b.onclick=()=>openType(b.dataset.type);b.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')openType(b.dataset.type);};});
 }
 function renderHourChart(values){
   const root=$('#chart-hour'); if(!root) return;
