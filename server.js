@@ -1,20 +1,19 @@
-/* ============================================================================
-   SurakshyaPath (सुरक्षापथ) — Backend
-   ----------------------------------------------------------------------------
-   Core features:
-     1. Anonymous incident reporting      POST /api/reports
-     2. Dynamic risk-zone computation     GET  /api/zones
-     3. Timing & frequency analytics      GET  /api/analytics
-     4. Patrol route computation          GET  /api/patrol
-     5. Officer resource allocation       GET  /api/allocation
-
-   Algorithms are separated into:
-     ./algorithms/risk.js
-     ./algorithms/routing.js
-
-   Data is stored in:
-     ./data/incidents.json
-   ========================================================================== */
+// ============================================================================
+// SurakshyaPath — Express Server
+// ============================================================================
+// Main application server.
+//
+// The server handles:
+//   - API routes
+//   - incident storage
+//   - zone/station configuration
+//   - coordination between algorithm modules
+//
+// Core algorithms are kept separately in:
+//   - algorithms/risk.js
+//   - algorithms/routing.js
+//   - algorithms/allocation.js
+// ============================================================================
 
 const express = require('express');
 const fs = require('fs');
@@ -28,133 +27,132 @@ const {
   computePatrol: computePatrolFromModel,
 } = require('./algorithms/routing');
 
+const {
+  computeAllocation: computeAllocationFromModel,
+} = require('./algorithms/allocation');
+
 const app = express();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-
-/* ---------------------------------------------------------------------------
-   1. Reference data — neighbourhood zones & police stations
-   ------------------------------------------------------------------------- */
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
 
 const ZONES = [
   {
     id: 'thamel',
     name: 'Thamel',
-    np: 'थामेल',
-    lat: 27.7165,
-    lng: 85.3125,
+    np: 'ठमेल',
+    lat: 27.715,
+    lng: 85.312,
   },
   {
     id: 'kalimati',
     name: 'Kalimati',
     np: 'कालीमाटी',
-    lat: 27.6960,
-    lng: 85.3000,
+    lat: 27.700,
+    lng: 85.282,
   },
   {
-    id: 'baneshwor',
+    id: 'new-baneshwor',
     name: 'New Baneshwor',
     np: 'नयाँ बानेश्वर',
-    lat: 27.6930,
-    lng: 85.3370,
+    lat: 27.691,
+    lng: 85.335,
   },
   {
     id: 'chabahil',
     name: 'Chabahil',
-    np: 'चाबाहिल',
-    lat: 27.7180,
-    lng: 85.3480,
+    np: 'चाबहिल',
+    lat: 27.717,
+    lng: 85.348,
   },
   {
     id: 'koteshwor',
     name: 'Koteshwor',
     np: 'कोटेश्वर',
-    lat: 27.6780,
-    lng: 85.3490,
+    lat: 27.678,
+    lng: 85.348,
   },
   {
     id: 'balaju',
     name: 'Balaju',
     np: 'बालाजु',
-    lat: 27.7370,
-    lng: 85.3020,
+    lat: 27.735,
+    lng: 85.303,
   },
   {
     id: 'patan',
     name: 'Patan',
     np: 'पाटन',
-    lat: 27.6720,
-    lng: 85.3250,
+    lat: 27.673,
+    lng: 85.324,
   },
   {
     id: 'gongabu',
     name: 'Gongabu',
     np: 'गोंगबु',
-    lat: 27.7350,
-    lng: 85.3160,
+    lat: 27.735,
+    lng: 85.313,
   },
   {
     id: 'kirtipur',
     name: 'Kirtipur',
     np: 'कीर्तिपुर',
-    lat: 27.6780,
-    lng: 85.2790,
+    lat: 27.678,
+    lng: 85.277,
   },
   {
     id: 'bouddha',
     name: 'Bouddha',
     np: 'बौद्ध',
-    lat: 27.7210,
-    lng: 85.3620,
+    lat: 27.721,
+    lng: 85.362,
   },
 ];
 
 const STATIONS = [
   {
-    id: 'mpr',
-    name: 'Metropolitan Police Range (Ratna Park)',
-    lat: 27.7040,
-    lng: 85.3150,
+    id: 'mpr-ratna-park',
+    name: 'MPR Ratna Park',
+    lat: 27.705,
+    lng: 85.315,
   },
   {
     id: 'baneshwor',
-    name: 'Police Circle, Baneshwor',
-    lat: 27.6925,
-    lng: 85.3360,
+    name: 'Baneshwor',
+    lat: 27.691,
+    lng: 85.335,
   },
   {
     id: 'chabahil',
-    name: 'Police Circle, Chabahil',
-    lat: 27.7175,
-    lng: 85.3470,
+    name: 'Chabahil',
+    lat: 27.717,
+    lng: 85.348,
   },
 ];
 
 const TYPES = {
   theft: {
-    label: 'Theft / Pickpocketing',
-    np: 'चोरी',
     severity: 5,
+    label: 'Theft',
   },
 
   suspicious: {
-    label: 'Suspicious Activity',
-    np: 'संदिग्ध गतिविधि',
     severity: 3,
+    label: 'Suspicious Activity',
   },
 
   harassment: {
-    label: 'Harassment',
-    np: 'उत्पीडन',
     severity: 7,
+    label: 'Harassment',
   },
 
   infrastructure: {
-    label: 'Infrastructure Issue',
-    np: 'पूर्वाधार समस्या',
     severity: 2,
+    label: 'Infrastructure Issue',
   },
 };
 
@@ -166,344 +164,230 @@ const DATA_FILE = path.join(
   'incidents.json'
 );
 
+// ============================================================================
+// SAMPLE DATA
+// ============================================================================
 
-/* ---------------------------------------------------------------------------
-   2. Incident store
-   ------------------------------------------------------------------------- */
-
-const SEED_PROFILE = {
-  thamel: {
-    count: 18,
-    types: {
-      theft: 0.6,
-      suspicious: 0.25,
-      harassment: 0.15,
-    },
-    night: 0.85,
+const seedProfiles = [
+  {
+    name: 'Resident',
+    weight: 55,
   },
-
-  kalimati: {
-    count: 15,
-    types: {
-      theft: 0.55,
-      suspicious: 0.3,
-      harassment: 0.15,
-    },
-    night: 0.7,
+  {
+    name: 'Student',
+    weight: 25,
   },
-
-  baneshwor: {
-    count: 12,
-    types: {
-      harassment: 0.45,
-      theft: 0.35,
-      suspicious: 0.2,
-    },
-    night: 0.6,
+  {
+    name: 'Business Owner',
+    weight: 15,
   },
-
-  chabahil: {
-    count: 10,
-    types: {
-      suspicious: 0.4,
-      theft: 0.4,
-      infrastructure: 0.2,
-    },
-    night: 0.5,
+  {
+    name: 'Visitor',
+    weight: 5,
   },
+];
 
-  koteshwor: {
-    count: 9,
-    types: {
-      theft: 0.5,
-      infrastructure: 0.3,
-      suspicious: 0.2,
-    },
-    night: 0.55,
-  },
-
-  gongabu: {
-    count: 9,
-    types: {
-      theft: 0.45,
-      suspicious: 0.4,
-      infrastructure: 0.15,
-    },
-    night: 0.65,
-  },
-
-  balaju: {
-    count: 7,
-    types: {
-      infrastructure: 0.4,
-      theft: 0.35,
-      suspicious: 0.25,
-    },
-    night: 0.4,
-  },
-
-  patan: {
-    count: 8,
-    types: {
-      theft: 0.45,
-      suspicious: 0.35,
-      harassment: 0.2,
-    },
-    night: 0.5,
-  },
-
-  bouddha: {
-    count: 5,
-    types: {
-      theft: 0.4,
-      suspicious: 0.4,
-      infrastructure: 0.2,
-    },
-    night: 0.5,
-  },
-
-  kirtipur: {
-    count: 4,
-    types: {
-      infrastructure: 0.5,
-      theft: 0.3,
-      suspicious: 0.2,
-    },
-    night: 0.25,
-  },
-};
-
-const SAMPLE_NOTES = {
+const sampleNotes = {
   theft: [
-    'Phone snatched by a motorcycle rider.',
-    'Shop cash box stolen at closing time.',
-    'Bag pickpocketed in the crowd.',
-    'Bicycle stolen from parking area.',
+    'Phone reported missing near a crowded area.',
+    'Bag reported missing.',
+    'Possible theft reported by resident.',
   ],
 
   suspicious: [
-    'Two men loitering near the ATM for hours.',
-    'Unknown group gathering late at night.',
-    'Someone checking parked scooter locks.',
-    'Unattended bag near the gate.',
+    'Suspicious activity reported near a public area.',
+    'Resident reported unusual activity.',
+    'Unidentified activity observed.',
   ],
 
   harassment: [
-    'Eve-teasing near the bus stop.',
-    'Followed by a stranger on the way home.',
-    'Verbal abuse outside the college gate.',
+    'Harassment reported by resident.',
+    'Verbal harassment reported.',
+    'Unsafe interaction reported.',
   ],
 
   infrastructure: [
-    'Street light not working — fully dark lane.',
-    'Open manhole on the footpath.',
-    'Broken CCTV pole at the chowk.',
-    'No lighting at the underpass.',
+    'Broken streetlight reported.',
+    'Damaged public infrastructure reported.',
+    'Poor lighting reported.',
   ],
 };
 
-function rand(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function rand(min, max) {
+  return Math.random() * (max - min) + min;
 }
 
-function weightedPick(weights) {
-  const r = Math.random();
+function weightedPick(items) {
+  const total = items.reduce(
+    (sum, item) => sum + item.weight,
+    0
+  );
 
-  let acc = 0;
+  let random = Math.random() * total;
 
-  for (const [key, weight] of Object.entries(weights)) {
-    acc += weight;
+  for (const item of items) {
+    random -= item.weight;
 
-    if (r <= acc) {
-      return key;
+    if (random <= 0) {
+      return item.name;
     }
   }
 
-  return Object.keys(weights)[0];
+  return items[items.length - 1].name;
 }
+
+// ============================================================================
+// INCIDENT SEEDING
+// ============================================================================
 
 function seedIncidents() {
   const incidents = [];
 
-  let id = 1;
+  const zoneIds = ZONES.map(
+    (zone) => zone.id
+  );
 
-  for (const [zoneId, profile] of Object.entries(SEED_PROFILE)) {
-    const zone = ZONES.find(
-      (z) => z.id === zoneId
-    );
+  const typeIds = Object.keys(TYPES);
 
-    for (let i = 0; i < profile.count; i++) {
-      const daysAgo =
-        Math.random() * 30;
-
-      const nightRoll =
-        Math.random() < profile.night;
-
-      const hour = nightRoll
-        ? rand([
-            20,
-            21,
-            22,
-            23,
-            0,
-            1,
-            2,
-            3,
-          ])
-        : rand([
-            8,
-            9,
-            10,
-            11,
-            12,
-            13,
-            14,
-            15,
-            16,
-            17,
-            18,
-          ]);
-
-      const date = new Date(
-        Date.now() -
-          daysAgo * DAY_MS
-      );
-
-      date.setHours(
-        hour,
+  for (let i = 0; i < 180; i++) {
+    const type =
+      typeIds[
         Math.floor(
-          Math.random() * 60
-        ),
-        0,
-        0
-      );
+          Math.random() * typeIds.length
+        )
+      ];
 
-      const type =
-        weightedPick(
-          profile.types
-        );
+    const zone =
+      zoneIds[
+        Math.floor(
+          Math.random() * zoneIds.length
+        )
+      ];
 
-      incidents.push({
-        id: id++,
-        type,
-        zone: zoneId,
+    const ageDays = Math.random() * 30;
 
-        lat: +(
-          zone.lat +
-          (Math.random() - 0.5) *
-            0.012
-        ).toFixed(5),
+    const ts =
+      Date.now() -
+      ageDays * DAY_MS;
 
-        lng: +(
-          zone.lng +
-          (Math.random() - 0.5) *
-            0.012
-        ).toFixed(5),
+    incidents.push({
+      id: `seed-${i + 1}`,
 
-        ts: date.getTime(),
+      zone,
 
-        note: rand(
-          SAMPLE_NOTES[type]
-        ),
-      });
-    }
+      type,
+
+      ts: Math.round(ts),
+
+      reporter:
+        weightedPick(seedProfiles),
+
+      note:
+        sampleNotes[type][
+          Math.floor(
+            Math.random() *
+              sampleNotes[type].length
+          )
+        ],
+
+      lat:
+        ZONES.find(
+          (z) => z.id === zone
+        ).lat +
+        rand(-0.002, 0.002),
+
+      lng:
+        ZONES.find(
+          (z) => z.id === zone
+        ).lng +
+        rand(-0.002, 0.002),
+    });
   }
 
-  return incidents.sort(
-    (a, b) => a.ts - b.ts
-  );
+  return incidents;
 }
+
+// ============================================================================
+// DATA STORAGE
+// ============================================================================
 
 function load() {
   try {
+    if (!fs.existsSync(DATA_FILE)) {
+      return null;
+    }
+
     return JSON.parse(
       fs.readFileSync(
         DATA_FILE,
         'utf8'
       )
     );
-  } catch {
+  } catch (error) {
+    console.error(
+      'Failed to load incident data:',
+      error
+    );
+
     return null;
   }
 }
 
-function save() {
-  fs.mkdirSync(
-    path.dirname(DATA_FILE),
-    {
-      recursive: true,
-    }
-  );
+function save(data) {
+  try {
+    fs.mkdirSync(
+      path.dirname(DATA_FILE),
+      {
+        recursive: true,
+      }
+    );
 
-  fs.writeFileSync(
-    DATA_FILE,
-    JSON.stringify(
-      incidents,
-      null,
-      2
-    )
-  );
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(
+        data,
+        null,
+        2
+      )
+    );
+  } catch (error) {
+    console.error(
+      'Failed to save incident data:',
+      error
+    );
+  }
 }
 
 let incidents =
   load() || seedIncidents();
 
-save();
+save(incidents);
 
-
-/* ---------------------------------------------------------------------------
-   3. Geographic helpers
-   ------------------------------------------------------------------------- */
-
-function haversine(a, b) {
-  const R = 6371;
-
-  const toRad = (degrees) =>
-    (degrees * Math.PI) / 180;
-
-  const dLat = toRad(
-    b.lat - a.lat
-  );
-
-  const dLng = toRad(
-    b.lng - a.lng
-  );
-
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) *
-      Math.cos(toRad(b.lat)) *
-      Math.sin(dLng / 2) ** 2;
-
-  return (
-    2 *
-    R *
-    Math.asin(
-      Math.sqrt(h)
-    )
-  );
-}
+// ============================================================================
+// ZONE HELPERS
+// ============================================================================
 
 function nearestZone(lat, lng) {
-  let best = ZONES[0];
-
-  let bestDistance =
-    Infinity;
+  let best = null;
+  let bestDistance = Infinity;
 
   for (const zone of ZONES) {
     const distance =
-      haversine(
-        { lat, lng },
-        zone
+      Math.pow(
+        zone.lat - lat,
+        2
+      ) +
+      Math.pow(
+        zone.lng - lng,
+        2
       );
 
-    if (
-      distance <
-      bestDistance
-    ) {
-      bestDistance =
-        distance;
-
+    if (distance < bestDistance) {
+      bestDistance = distance;
       best = zone;
     }
   }
@@ -511,32 +395,23 @@ function nearestZone(lat, lng) {
   return best;
 }
 
-
-/* ---------------------------------------------------------------------------
-   4. Risk model interface
-   ------------------------------------------------------------------------- */
+// ============================================================================
+// RISK MODEL
+// ============================================================================
 
 function computeZones() {
   return computeZonesFromModel({
     zones: ZONES,
     incidents,
     types: TYPES,
+    days: 30,
   });
 }
 
+// ============================================================================
+// PATROL ROUTING
+// ============================================================================
 
-/* ---------------------------------------------------------------------------
-   5. Patrol route interface
-   ------------------------------------------------------------------------- */
-
-/*
- * The actual routing algorithm now lives in:
- *
- *     algorithms/routing.js
- *
- * This wrapper connects the algorithm to the application's
- * stations and current risk zones.
- */
 function computePatrol(
   stationId,
   stopCount = 5
@@ -556,477 +431,237 @@ function computePatrol(
   });
 }
 
-
-/* ---------------------------------------------------------------------------
-   6. Officer resource allocation
-   ------------------------------------------------------------------------- */
+// ============================================================================
+// RESOURCE ALLOCATION
+// ============================================================================
 
 function computeAllocation(
   officers = 12
 ) {
   const zones =
-    computeZones().filter(
-      (zone) =>
-        zone.count > 0
-    );
+    computeZones();
 
-  if (
-    !zones.length ||
-    officers < 1
-  ) {
-    return {
-      officers,
-      zones: [],
-    };
-  }
-
-  const totalScore =
-    zones.reduce(
-      (sum, zone) =>
-        sum + zone.score,
-      0
-    ) || 1;
-
-  const staffed =
-    zones.slice(
-      0,
-      Math.min(
-        officers,
-        zones.length
-      )
-    );
-
-  const shares =
-    staffed.map(
-      (zone) =>
-        (zone.score /
-          totalScore) *
-        officers
-    );
-
-  const assigned =
-    shares.map(
-      (share) => ({
-        floor:
-          Math.floor(share),
-
-        rem:
-          share % 1,
-      })
-    );
-
-  let left =
-    officers -
-    assigned.reduce(
-      (sum, item) =>
-        sum + item.floor,
-      0
-    );
-
-  assigned
-    .map(
-      (item, index) => ({
-        index,
-        rem: item.rem,
-      })
-    )
-    .sort(
-      (a, b) =>
-        b.rem - a.rem
-    )
-    .forEach(
-      (item) => {
-        if (left-- > 0) {
-          assigned[
-            item.index
-          ].floor++;
-        }
-      }
-    );
-
-  return {
+  return computeAllocationFromModel({
+    zones,
     officers,
-
-    zones: staffed.map(
-      (zone, index) => {
-        const peak =
-          zone.peakHour;
-
-        const from =
-          peak !== null
-            ? String(
-                (peak + 23) % 24
-              ).padStart(
-                2,
-                '0'
-              )
-            : '18';
-
-        const to =
-          peak !== null
-            ? String(
-                (peak + 3) % 24
-              ).padStart(
-                2,
-                '0'
-              )
-            : '22';
-
-        return {
-          ...zone,
-
-          officers:
-            assigned[index]
-              .floor,
-
-          window:
-            `${from}:00–${to}:00`,
-        };
-      }
-    ),
-  };
+  });
 }
 
-
-/* ---------------------------------------------------------------------------
-   7. API routes
-   ------------------------------------------------------------------------- */
+// ============================================================================
+// API — HEALTH
+// ============================================================================
 
 app.get(
-  '/api/meta',
-  (_req, res) => {
+  '/api/health',
+  (req, res) => {
     res.json({
-      zones: ZONES,
-      stations: STATIONS,
-      types: TYPES,
-      generatedAt:
-        Date.now(),
+      ok: true,
+      service: 'SurakshyaPath',
     });
   }
 );
 
+// ============================================================================
+// API — CONFIGURATION
+// ============================================================================
 
-/* Anonymous incident reporting */
+app.get(
+  '/api/config',
+  (req, res) => {
+    res.json({
+      zones: ZONES,
+      stations: STATIONS,
+      types: TYPES,
+    });
+  }
+);
+
+// ============================================================================
+// API — INCIDENTS
+// ============================================================================
+
+app.get(
+  '/api/incidents',
+  (req, res) => {
+    res.json(incidents);
+  }
+);
+
 app.post(
-  '/api/reports',
+  '/api/incidents',
   (req, res) => {
     const {
-      type,
-      note = '',
-      when = 'now',
-    } = req.body || {};
-
-    if (!TYPES[type]) {
-      return res
-        .status(400)
-        .json({
-          error:
-            'Unknown incident type.',
-        });
-    }
-
-    const lat = Number(
-      req.body.lat
-    );
-
-    const lng = Number(
-      req.body.lng
-    );
-
-    if (
-      !(
-        lat >= 27.4 &&
-        lat <= 28.2 &&
-        lng >= 84.8 &&
-        lng <= 85.6
-      )
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            'Location outside the serviced municipality area.',
-        });
-    }
-
-    const tsMap = {
-      now: Date.now(),
-
-      today:
-        Date.now() -
-        Math.random() *
-          6 *
-          3600e3,
-
-      week:
-        Date.now() -
-        Math.random() *
-          6 *
-          DAY_MS,
-    };
-
-    const zone =
-      nearestZone(
-        lat,
-        lng
-      );
-
-    const report = {
-      id: incidents.length
-        ? Math.max(
-            ...incidents.map(
-              (incident) =>
-                incident.id
-            )
-          ) + 1
-        : 1,
-
-      type,
-
       lat,
       lng,
+      type,
+      note,
+      reporter,
+    } = req.body;
+
+    if (
+      typeof lat !== 'number' ||
+      typeof lng !== 'number' ||
+      !TYPES[type]
+    ) {
+      return res.status(400).json({
+        error:
+          'Invalid incident data.',
+      });
+    }
+
+    const zone =
+      nearestZone(lat, lng);
+
+    const incident = {
+      id:
+        `incident-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
 
       zone: zone.id,
 
-      ts: Math.round(
-        tsMap[when] ||
-          Date.now()
-      ),
+      type,
 
-      note: String(
-        note
-      ).slice(0, 280),
+      ts: Date.now(),
+
+      reporter:
+        reporter || 'Anonymous',
+
+      note:
+        note ||
+        sampleNotes[type][0],
+
+      lat,
+
+      lng,
     };
 
-    incidents.push(
-      report
+    incidents.push(incident);
+
+    save(incidents);
+
+    res.status(201).json(
+      incident
     );
-
-    save();
-
-    res
-      .status(201)
-      .json({
-        ok: true,
-        report,
-
-        zone: {
-          id: zone.id,
-          name: zone.name,
-          np: zone.np,
-        },
-      });
   }
 );
 
+// ============================================================================
+// API — RISK
+// ============================================================================
 
-/* Recent raw reports */
 app.get(
-  '/api/reports',
+  '/api/risk',
   (req, res) => {
-    const days =
-      Number(
-        req.query.days
-      ) || 30;
-
-    const cutoff =
-      Date.now() -
-      days * DAY_MS;
-
-    res.json(
-      incidents.filter(
-        (incident) =>
-          incident.ts >=
-          cutoff
-      )
-    );
-  }
-);
-
-
-/* Dynamic risk zones */
-app.get(
-  '/api/zones',
-  (_req, res) => {
     res.json(
       computeZones()
     );
   }
 );
 
+// ============================================================================
+// API — PATROL
+// ============================================================================
 
-/* Timing & frequency analytics */
+app.get(
+  '/api/patrol',
+  (req, res) => {
+    const station =
+      req.query.station ||
+      STATIONS[0].id;
+
+    const stopCount =
+      Number(
+        req.query.stops || 5
+      );
+
+    res.json(
+      computePatrol(
+        station,
+        stopCount
+      )
+    );
+  }
+);
+
+// ============================================================================
+// API — RESOURCE ALLOCATION
+// ============================================================================
+
+app.get(
+  '/api/allocation',
+  (req, res) => {
+    const officers =
+      Number(
+        req.query.officers || 12
+      );
+
+    res.json(
+      computeAllocation(
+        officers
+      )
+    );
+  }
+);
+
+// ============================================================================
+// API — ANALYTICS
+// ============================================================================
+
 app.get(
   '/api/analytics',
-  (_req, res) => {
-    const cutoff =
-      Date.now() -
-      30 * DAY_MS;
+  (req, res) => {
+    const now = Date.now();
 
-    const recent =
+    const last24h =
       incidents.filter(
         (incident) =>
-          incident.ts >=
-          cutoff
-      );
-
-    const byType =
-      Object.fromEntries(
-        Object.keys(
-          TYPES
-        ).map(
-          (type) => [
-            type,
-            0,
-          ]
-        )
-      );
-
-    const byHour =
-      Array(24).fill(0);
-
-    const byDay =
-      Array.from(
-        { length: 14 },
-        (_, index) => ({
-          day: index,
-          count: 0,
-        })
-      );
-
-    for (
-      const incident
-      of recent
-    ) {
-      byType[
-        incident.type
-      ]++;
-
-      byHour[
-        new Date(
-          incident.ts
-        ).getHours()
-      ]++;
-
-      const daysAgo =
-        Math.floor(
-          (Date.now() -
-            incident.ts) /
-            DAY_MS
-        );
-
-      if (
-        daysAgo >= 0 &&
-        daysAgo < 14
-      ) {
-        byDay[
-          13 - daysAgo
-        ].count++;
-      }
-    }
-
-    const nightCount =
-      recent.filter(
-        (incident) => {
-          const hour =
-            new Date(
-              incident.ts
-            ).getHours();
-
-          return (
-            hour >= 20 ||
-            hour < 4
-          );
-        }
+          now - incident.ts <
+          DAY_MS
       ).length;
 
+    const last7d =
+      incidents.filter(
+        (incident) =>
+          now - incident.ts <
+          7 * DAY_MS
+      ).length;
+
+    const last30d =
+      incidents.filter(
+        (incident) =>
+          now - incident.ts <
+          30 * DAY_MS
+      ).length;
+
+    const byType = {};
+
+    for (const incident of incidents) {
+      byType[incident.type] =
+        (byType[incident.type] || 0) +
+        1;
+    }
+
     res.json({
-      total:
-        recent.length,
-
+      total: incidents.length,
+      last24h,
+      last7d,
+      last30d,
       byType,
-
-      byHour,
-
-      byDay,
-
-      nightShare:
-        recent.length
-          ? Math.round(
-              (nightCount /
-                recent.length) *
-                100
-            )
-          : 0,
-
-      topZones:
-        computeZones()
-          .slice(0, 5)
-          .map(
-            (zone) => ({
-              name:
-                zone.name,
-
-              score:
-                zone.score,
-            })
-          ),
     });
   }
 );
 
-
-/* Patrol route */
-app.get(
-  '/api/patrol',
-  (req, res) => {
-    res.json(
-      computePatrol(
-        req.query.station,
-
-        Math.min(
-          Number(
-            req.query.stops
-          ) || 5,
-          8
-        )
-      )
-    );
-  }
-);
-
-
-/* Officer allocation */
-app.get(
-  '/api/allocation',
-  (req, res) => {
-    res.json(
-      computeAllocation(
-        Math.min(
-          Number(
-            req.query.officers
-          ) || 12,
-          60
-        )
-      )
-    );
-  }
-);
-
-
-/* ---------------------------------------------------------------------------
-   8. Server
-   ------------------------------------------------------------------------- */
+// ============================================================================
+// SERVER
+// ============================================================================
 
 const PORT =
   process.env.PORT || 3000;
 
 app.listen(
   PORT,
-  '0.0.0.0',
   () => {
     console.log(
-      `🛡️  SurakshyaPath API + UI running at http://localhost:${PORT}`
+      `SurakshyaPath running on port ${PORT}`
     );
   }
 );
