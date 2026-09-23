@@ -215,7 +215,7 @@ $('#report-form').addEventListener('submit', async (e) => {
     note: $('#f-note').value.trim(), lat: state.pick.lat, lng: state.pick.lng,
   };
   try {
-    const res = await fetch(`${API}/reports`, {
+    const res = await fetch(`${API}/incidents`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     });
     const data = await res.json();
