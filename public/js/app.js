@@ -97,7 +97,8 @@ async function refreshData() {
   state.zones = zones; state.reports = reports;
 
   // Stat chips
-  $('#stat-total').textContent = analytics.total;
+  $('#stat-total').textContent = reports.length;
+  if (analytics.total !== reports.length) console.warn('Incident count mismatch:', { api: reports.length, analytics: analytics.total });
   $('#stat-zones').textContent = zones.filter((z) => z.count > 0).length;
   $('#stat-critical').textContent = zones.filter((z) => z.band === 'high' || z.band === 'critical').length;
   const night = reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
