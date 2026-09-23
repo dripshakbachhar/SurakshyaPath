@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "research": "node experiments/run-research.js",
     "research-experiments": "node experiments/run-experiments.js",
     "patrol-experiments": "node experiments/run-patrol-experiments.js",
     "allocation-experiments": "node experiments/run-allocation-experiments.js",
