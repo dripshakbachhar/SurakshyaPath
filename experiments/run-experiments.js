@@ -92,6 +92,6 @@ fs.writeFileSync(
 
 console.log(`Generated experiment outputs for ${incidents.length} synthetic records.`);
 for (const [name, ranked] of Object.entries(comparison)) {
-  console.log(`\\n${name}`);
+  console.log(`\n${name}`);
   console.table(ranked);
 }
