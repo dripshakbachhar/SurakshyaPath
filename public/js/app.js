@@ -93,7 +93,7 @@ function useMyLocation() {
 
 async function refreshData() {
   const [zones, reports, analytics] = await Promise.all([
-    getJSON(`${API}/zones`), getJSON(`${API}/reports`), getJSON(`${API}/analytics`),
+    getJSON(`${API}/risk`), getJSON(`${API}/incidents`), getJSON(`${API}/analytics`),
   ]);
   state.zones = zones; state.reports = reports;
 
@@ -101,7 +101,8 @@ async function refreshData() {
   $('#stat-total').textContent = analytics.total;
   $('#stat-zones').textContent = zones.filter((z) => z.count > 0).length;
   $('#stat-critical').textContent = zones.filter((z) => z.band === 'high' || z.band === 'critical').length;
-  $('#stat-night').textContent = analytics.nightShare + '%';
+  const night = reports.filter((r) => { const h = new Date(r.ts).getHours(); return h >= 20 || h < 4; }).length;
+  $('#stat-night').textContent = analytics.total ? Math.round((night / analytics.total) * 100) + '%' : '0%';
 
   drawZones(); drawMarkers(); drawHeat(); renderZoneList(); drawCharts(analytics);
 }
@@ -219,7 +220,7 @@ $('#report-form').addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed');
-    toast(`✓ Reported anonymously — logged under zone "${data.zone.name}"`);
+    toast('✓ Reported anonymously');
     $('#f-note').value = ''; state.pick = null;
     $('#picked-spot').classList.remove('set');
     $('#picked-spot').textContent = '📍 No location picked yet — click anywhere on the map';
@@ -291,7 +292,7 @@ function drawRoute(route, alloc) {
 /* ---------------------------------- boot --------------------------------- */
 
 (async function boot() {
-  const meta = await getJSON(`${API}/meta`);
+  const meta = await getJSON(`${API}/config`);
   $('#p-station').innerHTML = meta.stations
     .map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   await refreshData();
