@@ -134,10 +134,18 @@ textarea { resize: vertical; }
 .alloc-card th { color: var(--muted); font-weight: 600; }
 
 /* -------------------------------- charts --------------------------------- */
-.chart-box { margin-top: 14px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 6px; }
+.chart-box {
+  margin-top: 14px; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px 10px; min-height: 205px;
+}
 .chart-box h3 { font-size: 12.5px; margin: 0 0 8px; color: var(--text); }
 .chart-box .hint { color: var(--muted); font-weight: 400; font-size: 11px; }
-.chart-box canvas { max-height: 170px; }
+.chart-box canvas {
+  display: block;
+  width: 100% !important;
+  height: 170px !important;
+  max-height: none;
+}
 
 /* ------------------------------ map extras ------------------------------- */
 .map-legend {
@@ -176,39 +184,15 @@ footer { padding: 7px 20px; font-size: 11.5px; color: var(--muted); background: 
   aside#panel { width: 100%; max-width: none; border-left: none; border-top: 1px solid var(--line); }
 }
 
-
 /* --------------------------- map zone information ------------------------ */
 .map-zone-info {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 1000;
-  width: 250px;
-  max-height: 55%;
-  overflow-y: auto;
-  padding: 12px;
-  background: rgba(11, 18, 32, .94);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.35);
+  position: absolute; top: 14px; left: 14px; z-index: 1000; width: 250px;
+  max-height: 55%; overflow-y: auto; padding: 12px; background: rgba(11, 18, 32, .94);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.35);
   pointer-events: auto;
 }
-.map-zone-title {
-  font-size: 13px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  margin-bottom: 8px;
-  color: var(--text);
-}
-.map-zone-row {
-  display: grid;
-  grid-template-columns: 24px 1fr auto;
-  gap: 7px;
-  align-items: center;
-  padding: 7px 0;
-  border-top: 1px solid rgba(255,255,255,.06);
-}
+.map-zone-title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; color: var(--text); }
+.map-zone-row { display: grid; grid-template-columns: 24px 1fr auto; gap: 7px; align-items: center; padding: 7px 0; border-top: 1px solid rgba(255,255,255,.06); }
 .map-zone-row:first-child { border-top: 0; }
 .map-zone-name { font-size: 12px; font-weight: 700; }
 .map-zone-meta { font-size: 10px; color: var(--muted); margin-top: 2px; }
