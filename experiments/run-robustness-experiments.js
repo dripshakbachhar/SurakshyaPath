@@ -1,0 +1,169 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
+const { ZONES } = require("../config/zones");
+const { RESEARCH_SEVERITY } = require("../config/severity");
+const { scoreModels } = require("../algorithms/research-models");
+const { computeAllocation } = require("../algorithms/allocation");
+const { computePatrol } = require("../algorithms/routing");
+
+const COUNT = 1567;
+const SEEDS = [208304, 208305, 208306, 208307, 208308];
+const OFFICERS = 12;
+const STOP_COUNT = 5;
+const bounds = { minLat: 27.60, maxLat: 27.78, minLon: 85.20, maxLon: 85.50 };
+const zoneNames = ZONES.map(zone => zone.name);
+const station = { name: "MPR Ratna Park", lat: 27.705, lng: 85.315 };
+const models = [
+  "frequency-only",
+  "severity-only",
+  "frequency-severity",
+  "current-severity-recency"
+];
+
+function random(seed) {
+  return () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+}
+
+function pickCategory(i) {
+  if (i <= 626) return ["theft", RESEARCH_SEVERITY.theft];
+  if (i <= 1017) return ["suspicious", RESEARCH_SEVERITY.suspicious];
+  if (i <= 1330) return ["harassment", RESEARCH_SEVERITY.harassment];
+  return ["infrastructure", RESEARCH_SEVERITY.infrastructure];
+}
+
+function nearestZone(lat, lng) {
+  return ZONES.reduce((best, zone) => {
+    const d = Math.hypot(lat - zone.lat, lng - zone.lng);
+    return d < best.d ? { zone, d } : best;
+  }, { zone: ZONES[0], d: Infinity }).zone.name;
+}
+
+function generate(seed) {
+  const next = random(seed);
+  const incidents = [];
+
+  for (let i = 1; i <= COUNT; i++) {
+    const [category, severity] = pickCategory(i);
+    const latitude = bounds.minLat + next() * (bounds.maxLat - bounds.minLat);
+    const longitude = bounds.minLon + next() * (bounds.maxLon - bounds.minLon);
+    const ageDays = Math.floor(next() * 30);
+
+    incidents.push({
+      category,
+      severity,
+      ageDays,
+      latitude,
+      longitude,
+      zone: nearestZone(latitude, longitude)
+    });
+  }
+
+  return incidents;
+}
+
+function rank(scores) {
+  return Object.entries(scores)
+    .sort((a, b) => b[1] - a[1])
+    .map(([zone], index) => ({ zone, rank: index + 1 }));
+}
+
+function summarizeSeed(seed) {
+  const incidents = generate(seed);
+  const counts = Object.fromEntries(zoneNames.map(zone => [zone, 0]));
+  incidents.forEach(incident => counts[incident.zone]++);
+
+  const scored = scoreModels(incidents, zoneNames);
+  const result = { seed, dataset_count: incidents.length, models: {} };
+
+  for (const model of models) {
+    const ranked = rank(scored[model]);
+    const zones = ZONES.map(zone => ({
+      ...zone,
+      count: counts[zone.name],
+      score: scored[model][zone.name],
+      peakHour: null
+    }));
+
+    const allocation = computeAllocation({ officers: OFFICERS, zones });
+    const patrol = computePatrol({ station, zones: ranked.map(row => zones.find(zone => zone.name === row.zone)), stopCount: STOP_COUNT });
+
+    result.models[model] = {
+      top_zone: ranked[0].zone,
+      rank_order: ranked.map(row => row.zone),
+      allocation: Object.fromEntries(allocation.zones.map(zone => [zone.name, zone.officers])),
+      patrol_km: patrol.totalKm,
+      patrol_order: patrol.stops.map(stop => stop.name)
+    };
+  }
+
+  return result;
+}
+
+const resultsDir = path.join(__dirname, "results", "robustness");
+fs.mkdirSync(resultsDir, { recursive: true });
+
+const results = SEEDS.map(summarizeSeed);
+
+const baseline = "frequency-only";
+const summary = [];
+
+for (const model of models) {
+  for (const result of results) {
+    const referenceRanks = Object.fromEntries(
+      result.models[baseline].rank_order.map((zone, index) => [zone, index + 1])
+    );
+    const rows = result.models[model].rank_order;
+    const rankShift = rows.reduce(
+      (sum, zone, index) => sum + Math.abs(index + 1 - referenceRanks[zone]),
+      0
+    ) / rows.length;
+
+    const referenceAllocation = result.models[baseline].allocation;
+    const allocation = result.models[model].allocation;
+    const changedAllocationZones = Object.keys(allocation)
+      .filter(zone => allocation[zone] !== referenceAllocation[zone]).length;
+
+    summary.push([
+      result.seed,
+      model,
+      result.models[model].top_zone,
+      Number(rankShift.toFixed(2)),
+      changedAllocationZones,
+      result.models[model].patrol_km
+    ]);
+  }
+}
+
+const header = [
+  "seed",
+  "model",
+  "top_zone",
+  "mean_absolute_rank_shift_vs_frequency",
+  "zones_with_changed_allocation_vs_frequency",
+  "patrol_km"
+];
+
+fs.writeFileSync(
+  path.join(resultsDir, "robustness-summary.csv"),
+  [header, ...summary].map(row => row.join(",")).join("\n") + "\n"
+);
+
+fs.writeFileSync(
+  path.join(resultsDir, "robustness-summary.json"),
+  JSON.stringify({
+    dataset_count: COUNT,
+    seeds: SEEDS,
+    officer_budget: OFFICERS,
+    stop_count: STOP_COUNT,
+    baseline_model: baseline,
+    note: "These are deterministic synthetic scenario replications generated by changing the seed. They test algorithmic robustness, not independence of real-world observations or statistical generalization.",
+    results
+  }, null, 2) + "\n"
+);
+
+console.log(`Robustness experiment completed across ${SEEDS.length} deterministic seeds.`);
+console.table(summary.map(row => Object.fromEntries(header.map((key, i) => [key, row[i]]))));
