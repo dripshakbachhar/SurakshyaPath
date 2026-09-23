@@ -109,7 +109,7 @@ fs.writeFileSync(path.join(outDir, "patrol-comparison.svg"), barChart(
   " km"
 ));
 
-fs.writeFileSync(path.join(outDir, "README.md"), `# Research figures
+fs.writeFileSync(path.join(outDir, "README.md"), "# Research figures
 
 Generated from the deterministic experiment outputs.
 
