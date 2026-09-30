@@ -40,15 +40,17 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
 
   source.forEach((incident, index) => {
     const id = incident?.id;
-    if (id && seen.has(id)) duplicates++;
+    const isDuplicate = Boolean(id && seen.has(id));
+    if (isDuplicate) duplicates++;
     if (id) seen.add(id);
 
     const check = classifyRecord(incident, zonesById, now);
+    if (isDuplicate) check.reasons.push('duplicate id');
     if (!check.valid) {
       rejected.push({ index, id: id || null, reasons: check.reasons });
       if (check.reasons.includes('timestamp is in the future')) futureDates++;
       if (check.reasons.some(reason => reason.includes('outside configured bounds'))) invalidCoordinates++;
-      if (check.reasons.some(reason => reason.includes('invalid') || reason.includes('unknown'))) missingValues++;
+      if (check.reasons.some(reason => reason.includes('invalid') || reason.includes('unknown') || reason.includes('missing'))) missingValues++;
     }
   });
 
