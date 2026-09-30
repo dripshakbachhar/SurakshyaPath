@@ -114,7 +114,7 @@ function validCoordinate(n, min, max) {
   return typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
 }
 function incidentTimestamp(when) {
-  const now = Date.now();
+  const now = snapshotNow();
   if (when === 'today') return now - 3 * 60 * 60 * 1000;
   if (when === 'week') return now - 3 * DAY_MS;
   return now;
