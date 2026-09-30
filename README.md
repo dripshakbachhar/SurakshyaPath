@@ -195,3 +195,23 @@ The patrol experiments use great-circle coordinate distance, not road-network tr
 ## License
 
 MIT
+
+
+## Local deployment and smoke check
+
+For a local development run:
+
+```bash
+npm ci
+npm run local
+```
+
+Then verify the service responds:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+For a non-default port, use `PORT=4000 npm run local`.
+
+The application is intentionally a local/research prototype. The security controls documented in `SECURITY.md` are not a production deployment baseline.

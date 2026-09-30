@@ -34,6 +34,9 @@ const DAY_MS = 86400000;
 const DATA_FILE = path.join(__dirname, 'data', 'incidents.json');
 const VALID_REPORT_WINDOWS = new Set(['today', 'week', 'month']);
 const MAX_REPORT_NOTE_LENGTH = 280;
+const MAX_INCIDENTS = 50000;
+const RATE_LIMIT_WINDOW_MS = 60000;
+const RATE_LIMIT_MAX = 12;
 
 function createSeededRandom(seed) {
   let state = seed >>> 0;
@@ -82,7 +85,13 @@ function seedIncidents() {
 
 function load() {
   try {
-    return fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')) : null;
+    if (!fs.existsSync(DATA_FILE)) return null;
+    const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (!Array.isArray(parsed) || parsed.length > MAX_INCIDENTS) {
+      console.error('Incident data has an invalid shape or exceeds the configured limit.');
+      return null;
+    }
+    return parsed;
   } catch (error) {
     console.error('Failed to load incident data:', error);
     return null;
@@ -91,10 +100,13 @@ function load() {
 function save(data) {
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    const temporary = DATA_FILE + '.tmp';
+    fs.writeFileSync(temporary, JSON.stringify(data, null, 2));
+    fs.renameSync(temporary, DATA_FILE);
     return true;
   } catch (error) {
     console.error('Failed to save incident data:', error);
+    try { fs.rmSync(DATA_FILE + '.tmp', { force: true }); } catch {}
     return false;
   }
 }
@@ -106,8 +118,8 @@ if (!save(incidents)) console.warn('Incident data is running in memory; persiste
 const reportWindow = new Map();
 function allowReport(ip) {
   const now = Date.now();
-  const recent = (reportWindow.get(ip) || []).filter(t => now - t < 60000);
-  if (recent.length >= 12) {
+  const recent = (reportWindow.get(ip) || []).filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= RATE_LIMIT_MAX) {
     reportWindow.set(ip, recent);
     return false;
   }
@@ -115,7 +127,7 @@ function allowReport(ip) {
   reportWindow.set(ip, recent);
   if (reportWindow.size > 10000) {
     for (const [key, timestamps] of reportWindow) {
-      if (!timestamps.some(t => now - t < 60000)) reportWindow.delete(key);
+      if (!timestamps.some(t => now - t < RATE_LIMIT_WINDOW_MS)) reportWindow.delete(key);
     }
   }
   return true;
@@ -160,6 +172,9 @@ app.get('/api/incidents', (req, res) => res.json(incidents));
 
 app.post('/api/incidents', (req, res) => {
   const { lat, lng, type, note, when } = req.body || {};
+  if (incidents.length >= MAX_INCIDENTS) {
+    return res.status(503).json({ error: 'Incident storage limit reached.' });
+  }
   if (!validCoordinate(lat, 27.55, 27.85) ||
       !validCoordinate(lng, 85.15, 85.55) ||
       !TYPES[type] ||
@@ -230,9 +245,7 @@ app.get('/api/dashboard', (req, res) => {
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 app.use((error, req, res, next) => {
-  if (error?.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'Malformed JSON request body.' });
-  }
+  if (error?.type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON request body.' });
   console.error('Unhandled request error:', error);
   if (res.headersSent) return next(error);
   res.status(500).json({ error: 'Internal server error.' });
@@ -253,4 +266,4 @@ const shutdown = signal => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-module.exports = { app, seedIncidents, validCoordinate, nearestZone };
+module.exports = { app, seedIncidents, validCoordinate, nearestZone, buildAnalytics, buildStats };

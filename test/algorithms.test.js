@@ -111,3 +111,17 @@ test('research models return the same zone keys', () => {
   assert.equal(result.zones.reduce((sum, zone) => sum + zone.officers, 0), 5);
   assert.deepEqual(result.zones.map(zone => zone.officers), [2, 2, 1]);
 });
+test('analytics excludes future incidents and keeps stable day buckets', () => {
+  const now = Date.UTC(2026, 8, 30);
+  const analytics = require('../server').buildAnalytics([
+    { type: 'theft', ts: now - 2 * 86400000 },
+    { type: 'harassment', ts: now - 12 * 60 * 60 * 1000 },
+    { type: 'theft', ts: now + 86400000 },
+  ], now);
+  assert.equal(analytics.total, 2);
+  assert.equal(analytics.last7d, 2);
+  assert.equal(analytics.last30d, 2);
+  assert.equal(analytics.byType.theft, 1);
+  assert.equal(analytics.byType.harassment, 1);
+  assert.equal(analytics.byDay.length, 30);
+});
