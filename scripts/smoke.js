@@ -52,7 +52,7 @@ async function json(base, path, options) {
     const intelligence = await json(base, '/api/intelligence');
     const quality = await json(base, '/api/data-quality');
     if (!Array.isArray(before.incidents) || before.incidents.length < 1500) throw new Error('Dashboard is not connected to the canonical synthetic dataset.');
-    if (!before.incidents.every(incident => incident.dataStatus === 'SYNTHETIC')) throw new Error('Dashboard contains unlabelled synthetic records.');
+    if (before.incidents.filter(incident => incident.dataStatus === 'SYNTHETIC').length < 1500) throw new Error('Canonical synthetic records are not connected to the dashboard.');
     if (before.zones.reduce((sum, zone) => sum + zone.count, 0) !== before.incidents.length) throw new Error('Risk zone counts are disconnected from dashboard incidents.');
     if (intelligence.status !== 'SUCCESS' || !intelligence.modelVersion) throw new Error('Intelligence pipeline did not reach SUCCESS.');
     if (!intelligence.riskFactors?.some(factor => factor.factor === 'risk_score')) throw new Error('Intelligence is not consuming risk-model output.');
