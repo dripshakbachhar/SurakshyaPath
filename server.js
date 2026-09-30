@@ -114,7 +114,8 @@ function save(data) {
 let incidents = load() || seedIncidents();
 let riskCache = null;
 const RISK_CACHE_MS = 60000;
-if (!save(incidents)) console.warn('Incident data is running in memory; persistence is unavailable.');
+let persistenceAvailable = save(incidents);
+if (!persistenceAvailable) console.warn('Incident data is running in memory; persistence is unavailable.');
 
 const reportWindow = new Map();
 function allowReport(ip) {
@@ -193,9 +194,11 @@ app.post('/api/incidents', (req, res) => {
   };
   incidents.push(incident);
   if (!save(incidents)) {
+    persistenceAvailable = false;
     incidents.pop();
     return res.status(503).json({ error: 'Incident could not be persisted. Please try again.' });
   }
+  persistenceAvailable = true;
   riskCache = null;
   res.status(201).json(incident);
 });
@@ -245,7 +248,7 @@ app.get('/api/diagnostics', (req, res) => {
   res.json({
     status: intelligence.status,
     data: { records: incidents.length, validRecords: quality.recordsAccepted, qualityScore: quality.qualityScore },
-    pipeline: { storage: true, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
+    pipeline: { storage: persistenceAvailable, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
     model: { type: intelligence.modelType, version: intelligence.modelVersion },
     generatedAt: intelligence.generatedAt
   });
