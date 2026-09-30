@@ -34,7 +34,7 @@ const STATIONS = [
 
 const DAY_MS = 86400000;
 const DATA_FILE = path.join(__dirname, 'data', 'incidents.json');
-const VALID_REPORT_WINDOWS = new Set(['today', 'week', 'month']);
+const VALID_REPORT_WINDOWS = new Set(['now', 'today', 'week', 'month']);
 const MAX_REPORT_NOTE_LENGTH = 280;
 const MAX_INCIDENTS = 50000;
 const RATE_LIMIT_WINDOW_MS = 60000;
