@@ -39,6 +39,13 @@ const MAX_REPORT_NOTE_LENGTH = 280;
 const MAX_INCIDENTS = 50000;
 const RATE_LIMIT_WINDOW_MS = 60000;
 const RATE_LIMIT_MAX = 12;
+const sampleNotes = {
+  theft: ['Phone reported missing near a crowded area.', 'Bag reported missing.', 'Possible theft reported by resident.'],
+  suspicious: ['Suspicious activity reported near a public area.', 'Resident reported unusual activity.', 'Unidentified activity observed.'],
+  harassment: ['Harassment reported by resident.', 'Verbal harassment reported.', 'Unsafe interaction reported.'],
+  infrastructure: ['Broken streetlight reported.', 'Damaged public infrastructure reported.', 'Poor lighting reported.']
+};
+
 
 function seedIncidents(now = Date.now()) {
   return loadSyntheticIncidents(now);
@@ -156,7 +163,7 @@ app.post('/api/incidents', (req, res) => {
   const zone = nearestZone(lat, lng);
   const incident = {
     id: 'incident-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
-    zone: zone.id, type, ts: incidentTimestamp(when), reporter: 'Anonymous',
+    zone: zone.id, type, severity: TYPES[type].severity, ts: incidentTimestamp(when), reporter: 'Anonymous',
     note: typeof note === 'string' ? note.trim().slice(0, MAX_REPORT_NOTE_LENGTH) || sampleNotes[type][0] : sampleNotes[type][0],
     sourceType: 'community-report', dataStatus: 'LIVE',
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
