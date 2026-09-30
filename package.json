@@ -1,11 +1,13 @@
 {
   "name": "surakshyapath",
-  "version": "1.0.0",
-  "description": "SurakshyaPath — experimental data-driven incident analysis, risk modelling, patrol routing, and resource allocation.",
+  "version": "1.1.0",
+  "description": "SurakshyaPath — reproducible incident analysis, explainable risk modelling, patrol routing, and resource-allocation research.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "local": "node scripts/local.js",
+    "test": "node --test test/*.test.js",
     "research": "node experiments/run-research.js",
     "research-experiments": "node experiments/run-experiments.js",
     "patrol-experiments": "node experiments/run-patrol-experiments.js",
@@ -14,11 +16,7 @@
     "robustness-experiments": "node experiments/run-robustness-experiments.js",
     "figures": "node experiments/generate-figures.js"
   },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "express": "^4.19.2"
-  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "express": "^4.19.2" },
   "license": "MIT"
 }
