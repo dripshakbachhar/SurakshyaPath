@@ -79,7 +79,8 @@ function save(data) {
   }
 }
 let incidents = load();
-if (!incidents) {
+const isLegacyRuntimeSeed = Array.isArray(incidents) && incidents.length === 180 && incidents.every(incident => String(incident.id || '').startsWith('seed-'));
+if (!incidents || isLegacyRuntimeSeed) {
   try {
     incidents = seedIncidents();
   } catch (error) {
