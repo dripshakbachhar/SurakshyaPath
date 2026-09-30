@@ -51,8 +51,11 @@ async function json(base, path, options) {
     const before = await json(base, '/api/dashboard');
     const intelligence = await json(base, '/api/intelligence');
     const quality = await json(base, '/api/data-quality');
-    if (!Array.isArray(before.incidents) || before.incidents.length < 1) throw new Error('Dashboard has no seeded incidents.');
-    if (!intelligence.status || !intelligence.modelVersion) throw new Error('Intelligence contract is incomplete.');
+    if (!Array.isArray(before.incidents) || before.incidents.length < 1500) throw new Error('Dashboard is not connected to the canonical synthetic dataset.');
+    if (before.incidents.filter(incident => incident.dataStatus === 'SYNTHETIC').length < 1500) throw new Error('Canonical synthetic records are not connected to the dashboard.');
+    if (before.zones.reduce((sum, zone) => sum + zone.count, 0) !== before.incidents.length) throw new Error('Risk zone counts are disconnected from dashboard incidents.');
+    if (intelligence.status !== 'SUCCESS' || !intelligence.modelVersion) throw new Error('Intelligence pipeline did not reach SUCCESS.');
+    if (!intelligence.riskFactors?.some(factor => factor.factor === 'risk_score')) throw new Error('Intelligence is not consuming risk-model output.');
     if (quality.recordsAccepted < 1) throw new Error('Data-quality pipeline accepted no records.');
 
     const created = await json(base, '/api/incidents', {
@@ -62,8 +65,9 @@ async function json(base, path, options) {
     });
 
     const after = await json(base, '/api/dashboard');
-    if (!created.id) throw new Error('Incident creation returned no id.');
+    if (!created.id || created.dataStatus !== 'LIVE') throw new Error('Incident creation returned an incomplete live-data record.');
     if (after.incidents.length !== before.incidents.length + 1) throw new Error('Created incident did not propagate to dashboard state.');
+    if (after.dataQuality.recordsAccepted !== after.incidents.length) throw new Error('Created incident did not pass the data-quality gate.');
     if (!after.intelligence || after.intelligence.dataCoverage.analyzedRecords < 1) throw new Error('Created incident did not propagate to intelligence.');
 
     console.log('Smoke test passed: health → data → intelligence → create incident → dashboard propagation.');

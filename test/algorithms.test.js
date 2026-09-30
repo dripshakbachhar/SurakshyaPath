@@ -103,7 +103,9 @@ test('research models return the same zone keys', () => {
   assert.deepEqual(Object.keys(models['frequency-only']), zones);
   assert.deepEqual(Object.keys(models['current-severity-recency']), zones);
 });
-\n\ntest('zero-score allocation still conserves the requested budget', () => {
+
+
+test('zero-score allocation still conserves the requested budget', () => {
   const zones = ZONES.slice(0, 3).map(zone => ({
     ...zone, count: 1, score: 0, peakHour: null
   }));
@@ -124,4 +126,51 @@ test('analytics excludes future incidents and keeps stable day buckets', () => {
   assert.equal(analytics.byType.theft, 1);
   assert.equal(analytics.byType.harassment, 1);
   assert.equal(analytics.byDay.length, 30);
+});
+
+
+test('canonical synthetic dataset feeds the live intelligence contract', () => {
+  const { loadSyntheticIncidents } = require('../data/live-incidents');
+  const { buildDataQuality, buildIntelligence } = require('../algorithms/intelligence');
+  const incidents = loadSyntheticIncidents(Date.UTC(2026, 8, 30));
+  assert.equal(incidents.length, 1567);
+  assert.ok(incidents.every(incident => incident.dataStatus === 'SYNTHETIC'));
+  assert.ok(incidents.every(incident => Number.isFinite(incident.ts)));
+  const quality = buildDataQuality(incidents, ZONES, Date.UTC(2026, 8, 30));
+  assert.equal(quality.recordsAccepted, 1567);
+  assert.equal(quality.recordsRejected, 0);
+  assert.equal(quality.qualityScore, 1);
+  const riskZones = computeZones({
+    zones: ZONES,
+    incidents,
+    types: INCIDENT_TYPES,
+    days: 30,
+    now: Date.UTC(2026, 8, 30)
+  });
+  const intelligence = buildIntelligence({
+    incidents,
+    zones: ZONES,
+    riskZones,
+    types: INCIDENT_TYPES,
+    now: Date.UTC(2026, 8, 30)
+  });
+  assert.equal(intelligence.status, 'SUCCESS');
+  assert.equal(intelligence.dataCoverage.analyzedRecords, 1567);
+  assert.equal(intelligence.dataCoverage.riskModelZones, ZONES.length);
+  assert.ok(intelligence.riskFactors.some(factor => factor.factor === 'risk_score'));
+});
+
+test('duplicate records are rejected by the data quality gate', () => {
+  const { buildDataQuality } = require('../algorithms/intelligence');
+  const incident = {
+    id: 'duplicate-1',
+    zone: ZONES[0].id,
+    type: 'theft',
+    ts: Date.UTC(2026, 8, 30),
+    lat: ZONES[0].lat,
+    lng: ZONES[0].lng
+  };
+  const quality = buildDataQuality([incident, { ...incident }], ZONES, Date.UTC(2026, 8, 30));
+  assert.equal(quality.recordsRejected, 1);
+  assert.equal(quality.duplicates, 1);
 });

@@ -40,15 +40,17 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
 
   source.forEach((incident, index) => {
     const id = incident?.id;
-    if (id && seen.has(id)) duplicates++;
+    const isDuplicate = Boolean(id && seen.has(id));
+    if (isDuplicate) duplicates++;
     if (id) seen.add(id);
 
     const check = classifyRecord(incident, zonesById, now);
+    if (isDuplicate) { check.reasons.push('duplicate id'); check.valid = false; }
     if (!check.valid) {
       rejected.push({ index, id: id || null, reasons: check.reasons });
       if (check.reasons.includes('timestamp is in the future')) futureDates++;
-      if (check.reasons.some(reason => reason.includes('outside configured bounds'))) invalidCoordinates++;
-      if (check.reasons.some(reason => reason.includes('invalid') || reason.includes('unknown'))) missingValues++;
+      invalidCoordinates += check.reasons.filter(reason => reason.includes('outside configured bounds')).length;
+      if (check.reasons.some(reason => reason.includes('invalid') || reason.includes('unknown') || reason.includes('missing'))) missingValues++;
     }
   });
 
@@ -66,7 +68,8 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
     futureDates,
     invalidCoordinates,
     qualityScore,
-    rejectedSamples: rejected.slice(0, 10)
+    rejectedSamples: rejected.slice(0, 10),
+    rejectedIndexes: rejected.map(item => item.index)
   };
 }
 
@@ -77,11 +80,13 @@ function statusFor(count, qualityScore) {
   return 'SUCCESS';
 }
 
-function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
+function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date.now() }) {
   const source = Array.isArray(incidents) ? incidents : [];
   const zoneList = Array.isArray(zones) ? zones : [];
   const quality = buildDataQuality(source, zoneList, now);
-  const valid = source.filter(incident => classifyRecord(incident, new Map(zoneList.map(z => [z.id, z])), now).valid);
+  const rejectedIndexes = new Set(quality.rejectedIndexes || []);
+  const zonesById = new Map(zoneList.map(z => [z.id, z]));
+  const valid = source.filter((incident, index) => !rejectedIndexes.has(index) && classifyRecord(incident, zonesById, now).valid);
   const recent30 = valid.filter(i => now - Number(i.ts) < 30 * DAY_MS);
   const recent7 = valid.filter(i => now - Number(i.ts) < 7 * DAY_MS);
   const previous7 = valid.filter(i => {
@@ -122,6 +127,7 @@ function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
         : 'STABLE';
 
   const topZone = rankedZones[0] || null;
+  const topRiskZone = [...(Array.isArray(riskZones) ? riskZones : [])].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))[0] || null;
   const topType = Object.entries(byType).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
   const evidenceDays = recent30.length
     ? Math.min(30, Math.max(1, Math.ceil((now - Math.min(...recent30.map(i => Number(i.ts)))) / DAY_MS)))
@@ -135,11 +141,13 @@ function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
   ).toFixed(2));
 
   const recommendations = [];
-  if (topZone && peak.hour !== null) {
+  if (topRiskZone && peak.hour !== null) {
     recommendations.push({
-      zone: topZone.zone,
-      reason: `${topZone.count} validated records in the 30-day window; peak observed hour is ${String(peak.hour).padStart(2, '0')}:00.`,
-      priority: topZone.count
+      zone: topRiskZone.name,
+      reason: `Highest modelled risk is ${topRiskZone.score}/100 from ${topRiskZone.count} validated 30-day records; peak observed hour is ${String(peak.hour).padStart(2, '0')}:00.`,
+      priority: topRiskZone.score,
+      riskScore: topRiskZone.score,
+      confidence
     });
   }
   if (trend === 'INCREASING') {
@@ -165,22 +173,25 @@ function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
     summary,
     patterns: [
       topZone ? `Highest observed 30-day volume: ${topZone.zone} (${topZone.count}).` : 'No zone pattern is available.',
+      topRiskZone ? `Highest modelled risk: ${topRiskZone.name} (${topRiskZone.score}/100, ${topRiskZone.band}).` : 'No risk model output is available.',
       topType ? `Most frequent type: ${types?.[topType[0]]?.label || topType[0]} (${topType[1]}).` : 'No incident-type pattern is available.',
       peak.hour !== null ? `Peak observed hour: ${String(peak.hour).padStart(2, '0')}:00 (${peak.count} records).` : 'No temporal pattern is available.'
     ],
     anomalies: trend === 'INCREASING'
       ? [{ type: 'volume_change', description: 'Recent 7-day volume exceeds the preceding 7-day baseline.' }]
       : [],
-    riskFactors: topZone
-      ? [{ factor: 'incident_volume', zone: topZone.zone, value: topZone.count }]
-      : [],
+    riskFactors: [
+      ...(topZone ? [{ factor: 'incident_volume', zone: topZone.zone, value: topZone.count }] : []),
+      ...(topRiskZone ? [{ factor: 'risk_score', zone: topRiskZone.name, value: topRiskZone.score, band: topRiskZone.band }] : [])
+    ],
     recommendations,
     confidence,
     dataCoverage: {
       validRecords: valid.length,
       analyzedRecords: recent30.length,
       evidenceDays,
-      activeZones: rankedZones.filter(z => z.count > 0).length
+      activeZones: rankedZones.filter(z => z.count > 0).length,
+      riskModelZones: Array.isArray(riskZones) ? riskZones.length : 0
     },
     trend: {
       direction: trend,

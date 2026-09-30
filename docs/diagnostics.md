@@ -8,20 +8,11 @@ Basic service liveness.
 
 ### `GET /api/data-quality`
 
-Reports:
-
-- records received
-- records accepted
-- records rejected
-- duplicate count
-- future-date count
-- coordinate validation count
-- quality score
-- sampled rejection reasons
+Reports received, accepted and rejected records plus duplicate, future-date, missing-value and coordinate diagnostics.
 
 ### `GET /api/intelligence`
 
-Returns the current explainable intelligence contract.
+Returns the explainable intelligence contract, including risk-model factors and evidence coverage.
 
 ### `GET /api/diagnostics`
 
@@ -33,8 +24,8 @@ Example shape:
 {
   "status": "SUCCESS",
   "data": {
-    "records": 180,
-    "validRecords": 180,
+    "records": 1567,
+    "validRecords": 1567,
     "qualityScore": 1
   },
   "pipeline": {
@@ -50,4 +41,4 @@ Example shape:
 }
 ```
 
-A storage value of `false` means the application is currently operating in memory and a restart may discard new reports.
+A storage value of `false` means the application is currently operating in memory and a restart may discard new reports. This can occur on serverless filesystems and is not equivalent to durable production persistence.

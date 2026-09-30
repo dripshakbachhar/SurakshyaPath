@@ -1,30 +1,24 @@
 # SurakshyaPath Data Flow
 
-## Incident lifecycle
+## Canonical incident lifecycle
 
-1. The application loads `data/incidents.json`.
-2. If the file is absent or invalid, `server.js` creates deterministic demo incidents.
-3. An anonymous report enters through `POST /api/incidents`.
-4. Boundary validation checks location, type, time-window and payload limits.
-5. The report is assigned to the nearest canonical zone.
-6. The report is persisted atomically when storage is available.
-7. The risk cache is invalidated.
-8. The next dashboard snapshot recomputes risk, analytics, data quality and intelligence.
-9. The browser replaces its normalized state with the snapshot.
-10. Map, charts, statistics, patrol and intelligence views derive from that state.
+The dashboard and research experiments now share the same canonical synthetic dataset: `data/synthetic_incidents.csv`.
 
-## Data lineage
-
-| Data | Created | Transformed | API | UI |
-|---|---|---|---|---|
-| Incident | seed/report route | validation + zone assignment | `/api/dashboard`, `/api/incidents` | map/report detail |
-| Zone risk | risk model | severity × recency | `/api/risk`, dashboard | risk map, overview, patrol |
-| Analytics | `buildAnalytics` | time/type aggregation | `/api/analytics`, dashboard | charts |
-| Data quality | intelligence module | validation/quality metrics | `/api/data-quality`, dashboard | intelligence |
-| Intelligence | intelligence module | temporal/type/zone fusion | `/api/intelligence`, dashboard | Intelligence tab |
-| Allocation | allocation model | largest remainder | `/api/allocation` | Patrol tab |
-| Route | routing model | nearest-neighbour | `/api/patrol` | map + Patrol tab |
+1. `data/synthetic_incidents.csv` provides 1,567 deterministic records.
+2. `data/live-incidents.js` normalizes each research row into the live incident contract, assigns the nearest canonical zone, converts `age_days` into a runtime timestamp, and preserves the `SYNTHETIC` provenance label.
+3. `server.js` loads persisted runtime reports when available; a missing/invalid store or legacy 180-record seed store is migrated to the canonical dataset.
+4. An anonymous report enters through `POST /api/incidents`.
+5. Boundary validation checks location, type, time-window and payload limits.
+6. The report is assigned to the nearest canonical zone and receives the shared incident severity.
+7. The report is persisted atomically when storage is available.
+8. The next dashboard snapshot recomputes risk, analytics, data quality and intelligence from the same incident snapshot.
+9. The intelligence layer consumes both validated observations and the resulting risk-zone model.
+10. The browser replaces its application state with that snapshot; map, charts, statistics, patrol and intelligence views derive from it.
 
 ## Propagation invariant
 
-A successfully persisted incident must appear in the next `/api/dashboard` response. The end-to-end `npm run smoke` test verifies this invariant and also verifies that intelligence is recomputed from the updated snapshot.
+A successfully persisted incident must appear in the next `/api/dashboard` response, pass the data-quality gate, influence the applicable analytical snapshot, and remain connected to the same risk model. The `npm run smoke` test verifies this path.
+
+## Deployment note
+
+Local hosting has writable JSON persistence. Serverless deployments may have ephemeral/read-only filesystems; the application can still serve the canonical synthetic dataset in memory, while live report persistence requires a durable external store for production deployment.

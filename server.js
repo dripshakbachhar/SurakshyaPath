@@ -11,6 +11,7 @@ const { computeZones: computeZonesFromModel } = require('./algorithms/risk');
 const { computePatrol: computePatrolFromModel } = require('./algorithms/routing');
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
 const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
+const { loadSyntheticIncidents } = require('./data/live-incidents');
 
 const app = express();
 app.disable('x-powered-by');
@@ -33,32 +34,11 @@ const STATIONS = [
 
 const DAY_MS = 86400000;
 const DATA_FILE = path.join(__dirname, 'data', 'incidents.json');
-const VALID_REPORT_WINDOWS = new Set(['today', 'week', 'month']);
+const VALID_REPORT_WINDOWS = new Set(['now', 'today', 'week', 'month']);
 const MAX_REPORT_NOTE_LENGTH = 280;
 const MAX_INCIDENTS = 50000;
 const RATE_LIMIT_WINDOW_MS = 60000;
 const RATE_LIMIT_MAX = 12;
-
-function createSeededRandom(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state = (1664525 * state + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-function rand(min, max, random = Math.random) { return random() * (max - min) + min; }
-function weightedPick(items, random = Math.random) {
-  let value = random() * items.reduce((s, i) => s + i.weight, 0);
-  for (const item of items) {
-    if ((value -= item.weight) <= 0) return item.name;
-  }
-  return items.at(-1).name;
-}
-
-const seedProfiles = [
-  { name: 'Resident', weight: 55 }, { name: 'Student', weight: 25 },
-  { name: 'Business Owner', weight: 15 }, { name: 'Visitor', weight: 5 }
-];
 const sampleNotes = {
   theft: ['Phone reported missing near a crowded area.', 'Bag reported missing.', 'Possible theft reported by resident.'],
   suspicious: ['Suspicious activity reported near a public area.', 'Resident reported unusual activity.', 'Unidentified activity observed.'],
@@ -66,22 +46,9 @@ const sampleNotes = {
   infrastructure: ['Broken streetlight reported.', 'Damaged public infrastructure reported.', 'Poor lighting reported.']
 };
 
-function seedIncidents() {
-  const incidents = [], random = createSeededRandom(208304);
-  const zoneIds = ZONES.map(z => z.id), typeIds = Object.keys(TYPES);
-  for (let i = 0; i < 180; i++) {
-    const type = typeIds[Math.floor(random() * typeIds.length)];
-    const zone = zoneIds[Math.floor(random() * zoneIds.length)];
-    const z = ZONES.find(x => x.id === zone);
-    incidents.push({
-      id: 'seed-' + (i + 1), zone, type, ts: Math.round(Date.now() - random() * 30 * DAY_MS),
-      reporter: weightedPick(seedProfiles, random),
-      note: sampleNotes[type][Math.floor(random() * sampleNotes[type].length)],
-      lat: z.lat + rand(-0.002, 0.002, random),
-      lng: z.lng + rand(-0.002, 0.002, random)
-    });
-  }
-  return incidents;
+
+function seedIncidents(now = Date.now()) {
+  return loadSyntheticIncidents(now);
 }
 
 function load() {
@@ -111,7 +78,16 @@ function save(data) {
     return false;
   }
 }
-let incidents = load() || seedIncidents();
+let incidents = load();
+const isLegacyRuntimeSeed = Array.isArray(incidents) && incidents.length === 180 && incidents.every(incident => String(incident.id || '').startsWith('seed-'));
+if (!incidents || isLegacyRuntimeSeed) {
+  try {
+    incidents = seedIncidents();
+  } catch (error) {
+    console.error('Failed to load canonical synthetic data:', error);
+    incidents = [];
+  }
+}
 let riskCache = null;
 const RISK_CACHE_MS = 60000;
 let persistenceAvailable = save(incidents);
@@ -138,7 +114,7 @@ function validCoordinate(n, min, max) {
   return typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
 }
 function incidentTimestamp(when) {
-  const now = Date.now();
+  const now = snapshotNow();
   if (when === 'today') return now - 3 * 60 * 60 * 1000;
   if (when === 'week') return now - 3 * DAY_MS;
   return now;
@@ -188,8 +164,9 @@ app.post('/api/incidents', (req, res) => {
   const zone = nearestZone(lat, lng);
   const incident = {
     id: 'incident-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
-    zone: zone.id, type, ts: incidentTimestamp(when), reporter: 'Anonymous',
+    zone: zone.id, type, severity: TYPES[type].severity, ts: incidentTimestamp(when), reporter: 'Anonymous',
     note: typeof note === 'string' ? note.trim().slice(0, MAX_REPORT_NOTE_LENGTH) || sampleNotes[type][0] : sampleNotes[type][0],
+    sourceType: 'community-report', dataStatus: 'LIVE',
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
   };
   incidents.push(incident);
@@ -240,11 +217,11 @@ function buildStats(source, now) {
 }
 app.get('/api/analytics', (req, res) => res.json(buildAnalytics(incidents)));
 app.get('/api/data-quality', (req, res) => res.json(buildDataQuality(incidents, ZONES)));
-app.get('/api/intelligence', (req, res) => res.json(buildIntelligence({ incidents, zones: ZONES, types: TYPES })));
+app.get('/api/intelligence', (req, res) => res.json(buildIntelligence({ incidents, zones: ZONES, riskZones: computeZones(), types: TYPES })));
 app.get('/api/diagnostics', (req, res) => {
   const now = snapshotNow();
   const quality = buildDataQuality(incidents, ZONES, now);
-  const intelligence = buildIntelligence({ incidents, zones: ZONES, types: TYPES, now });
+  const intelligence = buildIntelligence({ incidents, zones: ZONES, riskZones: computeZones(), types: TYPES, now });
   res.json({
     status: intelligence.status,
     data: { records: incidents.length, validRecords: quality.recordsAccepted, qualityScore: quality.qualityScore },
@@ -258,7 +235,7 @@ app.get('/api/dashboard', (req, res) => {
   const snapshot = incidents.slice();
   const now = snapshotNow();
   const zones = computeZonesFromModel({ zones: ZONES, incidents: snapshot, types: TYPES, days: 30, now });
-  const intelligence = buildIntelligence({ incidents: snapshot, zones: ZONES, types: TYPES, now });
+  const intelligence = buildIntelligence({ incidents: snapshot, zones: ZONES, riskZones: zones, types: TYPES, now });
   const dataQuality = buildDataQuality(snapshot, ZONES, now);
   res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now), intelligence, dataQuality });
 });
