@@ -77,7 +77,7 @@ function statusFor(count, qualityScore) {
   return 'SUCCESS';
 }
 
-function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
+function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date.now() }) {
   const source = Array.isArray(incidents) ? incidents : [];
   const zoneList = Array.isArray(zones) ? zones : [];
   const quality = buildDataQuality(source, zoneList, now);
@@ -122,6 +122,7 @@ function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
         : 'STABLE';
 
   const topZone = rankedZones[0] || null;
+  const topRiskZone = [...(Array.isArray(riskZones) ? riskZones : [])].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id))[0] || null;
   const topType = Object.entries(byType).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] || null;
   const evidenceDays = recent30.length
     ? Math.min(30, Math.max(1, Math.ceil((now - Math.min(...recent30.map(i => Number(i.ts)))) / DAY_MS)))
@@ -135,11 +136,13 @@ function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
   ).toFixed(2));
 
   const recommendations = [];
-  if (topZone && peak.hour !== null) {
+  if (topRiskZone && peak.hour !== null) {
     recommendations.push({
-      zone: topZone.zone,
-      reason: `${topZone.count} validated records in the 30-day window; peak observed hour is ${String(peak.hour).padStart(2, '0')}:00.`,
-      priority: topZone.count
+      zone: topRiskZone.name,
+      reason: `Highest modelled risk is ${topRiskZone.score}/100 from ${topRiskZone.count} validated 30-day records; peak observed hour is ${String(peak.hour).padStart(2, '0')}:00.`,
+      priority: topRiskZone.score,
+      riskScore: topRiskZone.score,
+      confidence
     });
   }
   if (trend === 'INCREASING') {
@@ -165,22 +168,25 @@ function buildIntelligence({ incidents, zones, types, now = Date.now() }) {
     summary,
     patterns: [
       topZone ? `Highest observed 30-day volume: ${topZone.zone} (${topZone.count}).` : 'No zone pattern is available.',
+      topRiskZone ? `Highest modelled risk: ${topRiskZone.name} (${topRiskZone.score}/100, ${topRiskZone.band}).` : 'No risk model output is available.',
       topType ? `Most frequent type: ${types?.[topType[0]]?.label || topType[0]} (${topType[1]}).` : 'No incident-type pattern is available.',
       peak.hour !== null ? `Peak observed hour: ${String(peak.hour).padStart(2, '0')}:00 (${peak.count} records).` : 'No temporal pattern is available.'
     ],
     anomalies: trend === 'INCREASING'
       ? [{ type: 'volume_change', description: 'Recent 7-day volume exceeds the preceding 7-day baseline.' }]
       : [],
-    riskFactors: topZone
-      ? [{ factor: 'incident_volume', zone: topZone.zone, value: topZone.count }]
-      : [],
+    riskFactors: [
+      ...(topZone ? [{ factor: 'incident_volume', zone: topZone.zone, value: topZone.count }] : []),
+      ...(topRiskZone ? [{ factor: 'risk_score', zone: topRiskZone.name, value: topRiskZone.score, band: topRiskZone.band }] : [])
+    ],
     recommendations,
     confidence,
     dataCoverage: {
       validRecords: valid.length,
       analyzedRecords: recent30.length,
       evidenceDays,
-      activeZones: rankedZones.filter(z => z.count > 0).length
+      activeZones: rankedZones.filter(z => z.count > 0).length,
+      riskModelZones: Array.isArray(riskZones) ? riskZones.length : 0
     },
     trend: {
       direction: trend,
