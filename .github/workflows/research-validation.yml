@@ -27,6 +27,8 @@ jobs:
         run: npm test
       - name: Run deterministic validation
         run: npm run validate
+      - name: Run end-to-end application smoke test
+        run: npm run smoke
       - name: Run reproducible research pipeline
         run: npm run research
       - name: Generate research figures
