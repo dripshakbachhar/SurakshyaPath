@@ -68,7 +68,8 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
     futureDates,
     invalidCoordinates,
     qualityScore,
-    rejectedSamples: rejected.slice(0, 10)
+    rejectedSamples: rejected.slice(0, 10),
+    rejectedIndexes: rejected.map(item => item.index)
   };
 }
 
@@ -83,7 +84,9 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
   const source = Array.isArray(incidents) ? incidents : [];
   const zoneList = Array.isArray(zones) ? zones : [];
   const quality = buildDataQuality(source, zoneList, now);
-  const valid = source.filter(incident => classifyRecord(incident, new Map(zoneList.map(z => [z.id, z])), now).valid);
+  const rejectedIndexes = new Set(quality.rejectedIndexes || []);
+  const zonesById = new Map(zoneList.map(z => [z.id, z]));
+  const valid = source.filter((incident, index) => !rejectedIndexes.has(index) && classifyRecord(incident, zonesById, now).valid);
   const recent30 = valid.filter(i => now - Number(i.ts) < 30 * DAY_MS);
   const recent7 = valid.filter(i => now - Number(i.ts) < 7 * DAY_MS);
   const previous7 = valid.filter(i => {
