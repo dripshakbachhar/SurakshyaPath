@@ -49,7 +49,7 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
     if (!check.valid) {
       rejected.push({ index, id: id || null, reasons: check.reasons });
       if (check.reasons.includes('timestamp is in the future')) futureDates++;
-      if (check.reasons.some(reason => reason.includes('outside configured bounds'))) invalidCoordinates++;
+      invalidCoordinates += check.reasons.filter(reason => reason.includes('outside configured bounds')).length;
       if (check.reasons.some(reason => reason.includes('invalid') || reason.includes('unknown') || reason.includes('missing'))) missingValues++;
     }
   });
