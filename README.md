@@ -1,192 +1,193 @@
 # 🛡️ SurakshyaPath · सुरक्षापथ
 
-**An experimental system for incident analysis, risk modelling, patrol routing, and resource allocation.**
+**A reproducible research and engineering system for incident analysis, explainable risk modelling, patrol-route experimentation, and resource-allocation analysis.**
 
-SurakshyaPath began as a hackathon prototype for anonymous incident reporting and map-based risk visualization. It is now a reproducible engineering and research project for testing how different risk-scoring assumptions affect geographic prioritization and downstream patrol and resource-allocation decisions.
+> **Research safety note:** the current spatial dataset is synthetic. SurakshyaPath is an experimental system, not a crime-prediction product and not an operational policing recommendation engine.
 
-## Research question
+## Why this project exists
 
-**How do different, explainable risk-scoring assumptions change geographic prioritization, patrol routing, and resource allocation when evaluated on the same synthetic dataset?**
+SurakshyaPath studies a practical systems question:
 
-The project deliberately compares multiple models rather than treating one scoring formula as objectively correct.
+> **How do different, explainable risk-scoring assumptions change geographic prioritization and downstream routing/resource-allocation outputs when evaluated on the same deterministic synthetic dataset?**
 
-SurakshyaPath started as a hackathon prototype for anonymous incident reporting and map-based risk visualization. It is now being developed as a small, reproducible engineering project for exploring how different risk-scoring assumptions affect geographic prioritization and downstream patrol/resource decisions.
+The project intentionally makes modelling assumptions visible and compares multiple approaches instead of treating a single formula as ground truth.
 
-> **Important:** this project does not claim to predict crime or represent real incident-level police records. The current spatial dataset is synthetic. Official aggregate statistics are used only as reference context.
-
-## What the project does
+## System pipeline
 
 ```
-Incident data
-     ↓
-Risk modelling
-     ↓
+Synthetic incident data
+        ↓
+Validation + spatial assignment
+        ↓
+Risk models
+        ↓
 Geographic prioritization
-     ↓
-Patrol routing
-     ↓
-Resource allocation
+     ↙       ↘
+Patrol routing   Resource allocation
+        ↓
+Dashboard + reproducible experiments
 ```
 
-The dashboard provides:
+## Features
 
-- anonymous incident submission for local testing
-- a Leaflet-based incident and heatmap view
-- explainable risk scores based on severity and recency
-- nearest-neighbour patrol routing
-- proportional resource allocation using the largest-remainder method
-- basic timing and frequency analytics
-
-## Data
-
-The current project uses one month: **Shrawan 2083 B.S.**
-
-- **Official reference:** Nepal Police reports **1,567 registered cases for Kathmandu Valley** for the month.
-- **Spatial layer:** 1,567 synthetic incident records are used to exercise the algorithms geographically.
-- **Synthetic data is clearly labelled:** it is not a set of real police incident coordinates.
-
-See [`data/data_sources.md`](data/data_sources.md) for provenance and limitations.
-
-## Risk model
-
-The baseline model is intentionally explainable:
-
-```
-risk(zone) = Σ severity(type) × recency_decay(incident)
-```
-
-Recency decay decreases with age and has a minimum weight of 0.15 over the 30-day modelling window. Zone scores are normalized from 0–100 against the highest-risk zone.
-
-The project also includes controlled experiments comparing:
-
-1. current severity × recency model
-2. frequency-only scoring
-3. severity-only scoring
-4. frequency × severity
-
-These experiments ask how sensitive geographic prioritization is to the assumptions inside the scoring formula. They are **not** presented as evidence that one model is preferable for real-world policing.
-
-## Experiments
-
-### Risk-model sensitivity
-
-Across five deterministic synthetic seeds, the severity-only model produces substantially different geographic rankings, while the frequency-based variants remain close to the frequency reference.
-
-Run:
-
-```bash
-npm run research-experiments
-```
-
-This compares the four scoring assumptions using the same deterministic synthetic dataset.
-
-### Patrol-route sensitivity
-
-Run:
-
-```bash
-npm run patrol-experiments
-```
-
-The patrol experiment selects the five highest-scoring zones under each model, runs the application's nearest-neighbour heuristic, and compares it with a simple 2-opt route-order improvement.
-
-In the current synthetic coordinate experiment, the severity-only model selects a different set of five zones. For the frequency-based/current models, 2-opt reduces the open-route estimate from **23.62 km to 22.31 km**. These are algorithm-test results, not road-network travel distances or patrol recommendations.
-
-### Resource-allocation sensitivity
-
-Run:
-
-```bash
-npm run allocation-experiments
-```
-
-This reuses the production largest-remainder allocation algorithm and tests the four risk models at **6, 12, and 20 officers**.
-
-For the 12-officer scenario, the synthetic experiment produces:
-
-| Risk model | Example allocation pattern |
-|---|---|
-| Frequency-only | Bouddha 3, Koteshwor 3, Balaju 2, Kirtipur 2 |
-| Severity-only | Chabahil 2, Koteshwor 2, and 1 officer across several other zones |
-| Frequency × severity | Bouddha 3, Koteshwor 3, Balaju 2, Kirtipur 2 |
-| Severity × recency | Bouddha 3, Koteshwor 3, Kirtipur 2, plus smaller allocations including Gongabu |
-
-For the canonical 12-officer experiment, the frequency-only, frequency × severity, and current severity × recency models produce the same integer allocation pattern. The severity-only model produces a different allocation across multiple zones. This illustrates how scoring assumptions can propagate into discrete resource decisions on the synthetic dataset.
-
-Results are written to `experiments/results/`.
+- 🗺️ Leaflet-based incident and risk-map dashboard
+- 📝 Anonymous local incident-reporting workflow
+- 📊 30-day risk scoring using severity × recency
+- 🧪 Frequency, severity, frequency×severity, and severity×recency research models
+- 🚔 Nearest-neighbour patrol routing with route-sensitivity experiments
+- 👮 Largest-remainder proportional allocation experiments
+- 📈 Timing, frequency, and trend analytics
+- 🔁 Deterministic synthetic-data generation
+- ✅ Node.js unit tests + deterministic validation
+- 🤖 GitHub Actions CI for code and research reproducibility
+- 🔐 Basic API hardening, security headers, payload limits, input validation, and rate limiting
+- 💻 One-command local hosting
 
 ## Architecture
 
 ```
-Browser (public/)
-  index.html · css/style.css · js/app.js
-        │
-        ▼
-Express server (server.js)
-        │
-        ├── algorithms/risk.js
-        ├── algorithms/routing.js
-        ├── algorithms/allocation.js
-        └── data/
+Browser
+  └── public/
+       ├── index.html
+       ├── css/style.css
+       └── js/app.js
+             │
+             ▼
+        Express API
+          server.js
+             │
+       ┌─────┼───────────────┐
+       ▼     ▼               ▼
+     risk  routing       allocation
+       │     │               │
+       └─────┼───────────────┘
+             ▼
+          config/
+          data/
+          experiments/
+          research/
 ```
+
+Core algorithms are intentionally small and independently testable.
 
 ## Quick start
 
-Requires Node.js 18+.
+Requires **Node.js 18+**.
 
 ```bash
 npm install
-npm start
+npm run local
 ```
 
-Then open `http://localhost:3000`.
+Open **http://localhost:3000**.
 
-## Why this project
+Alternative commands:
 
-The goal is not to build a black-box prediction system. It is to make the assumptions visible, test alternative approaches against the same data, and see whether those choices change downstream decisions such as patrol routing and resource allocation.
+```bash
+npm start          # production-style local start
+npm run dev        # Node watch mode
+PORT=4000 npm run local
+```
 
-## Current status
+## Quality checks
 
-- [x] Working web application
-- [x] One-month Kathmandu Valley dataset integration
-- [x] Explicit synthetic-data separation
-- [x] Baseline risk model
-- [x] Alternative risk-model experiments
-- [x] Patrol-route sensitivity experiment
-- [x] Resource-allocation sensitivity experiment
-- [x] Five-seed robustness experiment
-- [x] Deterministic validation
-- [x] Reproducible research figures
-- [x] Research results and limitations documentation
-- [ ] Final dashboard/experiment visualization
-- [ ] Portfolio-ready screenshots and demo documentation
+Run the same checks used by CI:
 
-## Limitations
+```bash
+npm test
+npm run validate
+npm run research
+npm run figures
+```
 
-- The spatial incident layer is synthetic.
-- The official police statistic is an aggregate count, not a geocoded incident dataset.
-- The current patrol planner uses a nearest-neighbour heuristic rather than an exact TSP solver.
-- The 2-opt experiment uses great-circle coordinate distance rather than a road network.
-- Resource allocations are mathematical outputs, not real staffing recommendations.
-- Risk scores depend on explicit assumptions about severity and recency.
-- Results from the synthetic dataset should not be interpreted as real-world crime predictions.
+Research experiment commands:
 
-## Responsible use
+```bash
+npm run research-experiments
+npm run patrol-experiments
+npm run allocation-experiments
+npm run robustness-experiments
+```
 
-- The spatial incident layer is synthetic.
-- Aggregate official statistics are not equivalent to geocoded incident records.
-- Nearest-zone assignment is a simplified spatial abstraction.
-- Severity values are explicit modelling assumptions.
-- Recency uses a fixed 30-day window and a minimum decay weight.
-- Resource allocation uses a fixed officer count and largest-remainder rounding.
-- Patrol routing uses a nearest-neighbour heuristic rather than an exact routing solver.
-- Route comparisons use great-circle coordinate distance rather than a road network, traffic, or travel-time API.
-- Synthetic scenario replications are not independent real-world observations.
-- Results are descriptive and deterministic, not statistical inference.
-- Resource-allocation outputs are algorithmic test results, not operational staffing recommendations.
-- Any real-world deployment would require validated data, domain expertise, legal and ethical review, security controls, auditability, and meaningful human oversight.
+Generated research outputs are stored under `experiments/results/`.
+
+## Research design
+
+The baseline risk model is:
+
+```
+risk(zone) = Σ severity(incident) × recency_decay(incident)
+```
+
+The current recency function gives newer records more weight and applies a minimum weight of 0.15 within the 30-day modelling window.
+
+The research suite compares:
+
+1. **frequency-only**
+2. **severity-only**
+3. **frequency × severity**
+4. **severity × recency**
+
+The purpose is sensitivity analysis: measuring how explicit modelling choices propagate into rankings, route order, and mathematical allocations.
+
+## Data provenance
+
+The repository currently contains **1,567 synthetic spatial records** representing a Shrawan 2083 experimental scenario. Aggregate official statistics are treated as contextual reference data, not as geocoded incident records.
+
+See:
+
+- `data/data_sources.md`
+- `data/README.md`
+- `research/LIMITATIONS.md`
+- `research/EXPERIMENT.md`
+- `research/RESULTS.md`
+
+## Responsible-use boundaries
+
+This project deliberately does **not** claim to:
+
+- predict individual crime events;
+- represent real incident-level police records;
+- produce operational patrol recommendations;
+- provide validated staffing recommendations;
+- infer causality from synthetic data;
+- establish that one risk model is objectively superior.
+
+The patrol experiments use great-circle coordinate distance, not road-network travel time. Resource allocation is an algorithmic experiment. Any real deployment would require validated data, domain expertise, legal/ethical review, security controls, auditability, and meaningful human oversight.
 
 **Reproducibility does not imply real-world validity.**
+
+## Engineering practices
+
+- Shared live incident taxonomy in `config/incident-types.js`
+- Research-only severity assumptions remain isolated in `config/severity.js`
+- Core algorithm tests use Node's built-in test runner
+- API input is validated at the boundary
+- JSON request bodies are size-limited
+- Security response headers are applied centrally
+- API 404s and unexpected errors return controlled JSON responses
+- Rate-limit state is bounded in memory
+- Server shutdown is graceful
+- Local runtime data remains ignored by Git
+- CI runs tests, validation, research generation, and figure generation
+
+## Project status
+
+- [x] Working dashboard
+- [x] Explainable baseline risk model
+- [x] Alternative model experiments
+- [x] Patrol-route sensitivity experiment
+- [x] Resource-allocation sensitivity experiment
+- [x] Robustness experiments
+- [x] Deterministic validation
+- [x] Reproducible research figures
+- [x] Automated unit tests
+- [x] CI quality pipeline
+- [x] Local hosting command
+- [x] Engineering/security documentation
+- [ ] Production deployment hardening
+- [ ] Road-network routing integration
+- [ ] External peer review of modelling assumptions
 
 ## License
 
