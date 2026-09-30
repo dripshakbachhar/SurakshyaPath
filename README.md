@@ -119,7 +119,7 @@ The baseline risk model is:
 risk(zone) = Σ severity(incident) × recency_decay(incident)
 ```
 
-The current recency function gives newer records more weight and applies a minimum weight of 0.15 within the 30-day modelling window.
+The current recency function gives newer records more weight and applies a minimum weight of 0.15 within the 30-day modelling window. Future-dated records are excluded from risk snapshots.
 
 The research suite compares:
 
@@ -167,6 +167,9 @@ The patrol experiments use great-circle coordinate distance, not road-network tr
 - Security response headers are applied centrally
 - API 404s and unexpected errors return controlled JSON responses
 - Rate-limit state is bounded in memory
+- Malformed JSON receives a controlled 400 response
+- Failed incident persistence is reported instead of returning a false success
+- Zero-score allocation inputs use a deterministic equal-share fallback
 - Server shutdown is graceful
 - Local runtime data remains ignored by Git
 - CI runs tests, validation, research generation, and figure generation

@@ -92,14 +92,16 @@ function save(data) {
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+    return true;
   } catch (error) {
     console.error('Failed to save incident data:', error);
+    return false;
   }
 }
 let incidents = load() || seedIncidents();
 let riskCache = null;
 const RISK_CACHE_MS = 60000;
-save(incidents);
+if (!save(incidents)) console.warn('Incident data is running in memory; persistence is unavailable.');
 
 const reportWindow = new Map();
 function allowReport(ip) {
@@ -174,7 +176,10 @@ app.post('/api/incidents', (req, res) => {
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
   };
   incidents.push(incident);
-  save(incidents);
+  if (!save(incidents)) {
+    incidents.pop();
+    return res.status(503).json({ error: 'Incident could not be persisted. Please try again.' });
+  }
   riskCache = null;
   res.status(201).json(incident);
 });
@@ -225,6 +230,9 @@ app.get('/api/dashboard', (req, res) => {
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 app.use((error, req, res, next) => {
+  if (error?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Malformed JSON request body.' });
+  }
   console.error('Unhandled request error:', error);
   if (res.headersSent) return next(error);
   res.status(500).json({ error: 'Internal server error.' });

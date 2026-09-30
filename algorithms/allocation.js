@@ -6,78 +6,57 @@
 // Officers are distributed proportionally according to zone risk scores
 // using the largest-remainder method.
 //
-// Future experiments can compare this approach with alternative allocation
-// strategies.
+// If every active zone has a zero score, there is no proportional signal;
+// the implementation falls back to equal shares with deterministic
+// largest-remainder tie-breaking so the requested budget is still conserved.
 // ============================================================================
 
-/**
- * Allocate officers across risk zones.
- *
- * @param {Object} options
- * @param {Array} options.zones
- * @param {number} options.officers
- *
- * @returns {Object}
- */
 function computeAllocation({
   zones,
   officers = 12,
 }) {
+  const budget = Number.isFinite(officers)
+    ? Math.max(0, Math.floor(officers))
+    : 0;
+
   const activeZones = zones.filter(
     (zone) => zone.count > 0
   );
 
-  if (
-    !activeZones.length ||
-    officers < 1
-  ) {
+  if (!activeZones.length || budget < 1) {
     return {
-      officers,
+      officers: budget,
       zones: [],
     };
   }
 
-  const totalScore =
-    activeZones.reduce(
-      (sum, zone) =>
-        sum + zone.score,
-      0
-    ) || 1;
+  const totalScore = activeZones.reduce(
+    (sum, zone) => sum + Math.max(0, Number(zone.score) || 0),
+    0
+  );
 
-  const shares = activeZones.map(
-    (zone) => ({
+  const denominator = totalScore > 0 ? totalScore : activeZones.length;
+
+  const shares = activeZones.map((zone) => {
+    const score = totalScore > 0 ? Math.max(0, Number(zone.score) || 0) : 1;
+    return {
       zone,
-      share:
-        (zone.score / totalScore) *
-        officers,
-    })
-  );
+      share: (score / denominator) * budget,
+    };
+  });
 
-  const assigned = shares.map(
-    (item) => ({
-      floor: Math.floor(item.share),
-      rem: item.share % 1,
-    })
-  );
+  const assigned = shares.map((item) => ({
+    floor: Math.floor(item.share),
+    rem: item.share % 1,
+  }));
 
   let remaining =
-    officers -
-    assigned.reduce(
-      (sum, item) =>
-        sum + item.floor,
-      0
-    );
+    budget -
+    assigned.reduce((sum, item) => sum + item.floor, 0);
 
   assigned
-    .map((item, index) => ({
-      index,
-      rem: item.rem,
-    }))
-    .sort(
-      (a, b) =>
-        b.rem - a.rem ||
-        a.index - b.index
-    )
+    .map((item, index) => ({ index, rem: item.rem }))
+    .sort((a, b) => b.rem - a.rem || a.index - b.index)
     .forEach((item) => {
       if (remaining > 0) {
         assigned[item.index].floor++;
@@ -86,38 +65,22 @@ function computeAllocation({
     });
 
   return {
-    officers,
+    officers: budget,
+    zones: activeZones.map((zone, index) => {
+      const peak = zone.peakHour;
+      const from = peak !== null
+        ? String((peak + 23) % 24).padStart(2, '0')
+        : '18';
+      const to = peak !== null
+        ? String((peak + 3) % 24).padStart(2, '0')
+        : '22';
 
-    zones: activeZones.map(
-      (zone, index) => {
-        const peak =
-          zone.peakHour;
-
-        const from =
-          peak !== null
-            ? String(
-                (peak + 23) % 24
-              ).padStart(2, '0')
-            : '18';
-
-        const to =
-          peak !== null
-            ? String(
-                (peak + 3) % 24
-              ).padStart(2, '0')
-            : '22';
-
-        return {
-          ...zone,
-
-          officers:
-            assigned[index].floor,
-
-          window:
-            `${from}:00–${to}:00`,
-        };
-      }
-    ),
+      return {
+        ...zone,
+        officers: assigned[index].floor,
+        window: `${from}:00–${to}:00`,
+      };
+    }),
   };
 }
 
