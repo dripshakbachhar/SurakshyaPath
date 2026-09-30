@@ -14,9 +14,14 @@
     "allocation-experiments": "node experiments/run-allocation-experiments.js",
     "validate": "node scripts/validate.js",
     "robustness-experiments": "node experiments/run-robustness-experiments.js",
-    "figures": "node experiments/generate-figures.js"
+    "figures": "node experiments/generate-figures.js",
+    "smoke": "node scripts/smoke.js"
   },
-  "engines": { "node": ">=18" },
-  "dependencies": { "express": "^4.19.2" },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
   "license": "MIT"
 }
