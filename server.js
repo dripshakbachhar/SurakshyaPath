@@ -10,6 +10,7 @@ const { INCIDENT_TYPES: TYPES } = require('./config/incident-types');
 const { computeZones: computeZonesFromModel } = require('./algorithms/risk');
 const { computePatrol: computePatrolFromModel } = require('./algorithms/routing');
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
+const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
 
 const app = express();
 app.disable('x-powered-by');
@@ -235,12 +236,28 @@ function buildStats(source, now) {
   return { total: source.length, activeZones, highRiskZones, nightShare: window.length ? Math.round(night / window.length * 100) : 0 };
 }
 app.get('/api/analytics', (req, res) => res.json(buildAnalytics(incidents)));
+app.get('/api/data-quality', (req, res) => res.json(buildDataQuality(incidents, ZONES)));
+app.get('/api/intelligence', (req, res) => res.json(buildIntelligence({ incidents, zones: ZONES, types: TYPES })));
+app.get('/api/diagnostics', (req, res) => {
+  const now = snapshotNow();
+  const quality = buildDataQuality(incidents, ZONES, now);
+  const intelligence = buildIntelligence({ incidents, zones: ZONES, types: TYPES, now });
+  res.json({
+    status: intelligence.status,
+    data: { records: incidents.length, validRecords: quality.recordsAccepted, qualityScore: quality.qualityScore },
+    pipeline: { storage: true, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
+    model: { type: intelligence.modelType, version: intelligence.modelVersion },
+    generatedAt: intelligence.generatedAt
+  });
+});
 
 app.get('/api/dashboard', (req, res) => {
   const snapshot = incidents.slice();
   const now = snapshotNow();
   const zones = computeZonesFromModel({ zones: ZONES, incidents: snapshot, types: TYPES, days: 30, now });
-  res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now) });
+  const intelligence = buildIntelligence({ incidents: snapshot, zones: ZONES, types: TYPES, now });
+  const dataQuality = buildDataQuality(snapshot, ZONES, now);
+  res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now), intelligence, dataQuality });
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
@@ -256,14 +273,19 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
   throw new Error('PORT must be an integer between 1 and 65535.');
 }
 
-const server = app.listen(PORT, () => console.log('SurakshyaPath running on port ' + PORT));
-const shutdown = signal => {
-  console.log(signal + ' received; shutting down gracefully.');
-  server.close(error => {
-    if (error) { console.error('Shutdown error:', error); process.exitCode = 1; }
-  });
-};
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+function startServer(port = PORT) {
+  const server = app.listen(port, () => console.log('SurakshyaPath running on port ' + port));
+  const shutdown = signal => {
+    console.log(signal + ' received; shutting down gracefully.');
+    server.close(error => {
+      if (error) { console.error('Shutdown error:', error); process.exitCode = 1; }
+    });
+  };
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  return server;
+}
 
-module.exports = { app, seedIncidents, validCoordinate, nearestZone, buildAnalytics, buildStats };
+if (require.main === module) startServer();
+
+module.exports = { app, startServer, seedIncidents, validCoordinate, nearestZone, buildAnalytics, buildStats };
