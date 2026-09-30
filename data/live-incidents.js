@@ -36,6 +36,7 @@ function loadSyntheticIncidents(now = Date.now()) {
     throw new Error(`Canonical synthetic dataset is missing: ${CSV_FILE}`);
   }
 
+  const snapshotNow = Math.floor(now / 60000) * 60000;
   const rows = parseCsv(fs.readFileSync(CSV_FILE, 'utf8'));
   return rows.map(row => {
     const lat = Number(row.latitude);
@@ -52,7 +53,7 @@ function loadSyntheticIncidents(now = Date.now()) {
       zone: zone.id,
       type: row.category,
       severity: Number(row.severity),
-      ts: now - ageDays * DAY_MS,
+      ts: snapshotNow - ageDays * DAY_MS,
       reporter: 'Synthetic simulation',
       note: `Synthetic research record (${row.category}).`,
       lat: Number(lat.toFixed(5)),
