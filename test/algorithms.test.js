@@ -43,6 +43,26 @@ test('zone computation is deterministic for a fixed snapshot', () => {
   assert.equal(a.reduce((sum, zone) => sum + zone.count, 0), 2);
 });
 
+test('future incidents do not enter a risk snapshot', () => {
+  const now = Date.UTC(2026, 8, 30);
+  const zones = [{ id: 'test-zone', name: 'Test', np: 'टेस्ट', lat: 27.7, lng: 85.3 }];
+  const incidents = [{ zone: 'test-zone', type: 'theft', ts: now + 3600000 }];
+  const result = computeZones({ zones, incidents, types: INCIDENT_TYPES, now });
+  assert.equal(result[0].count, 0);
+  assert.equal(result[0].score, 0);
+});
+
+test('peak-hour ties resolve to the earliest hour', () => {
+  const now = Date.UTC(2026, 8, 30, 23);
+  const zones = [{ id: 'test-zone', name: 'Test', np: 'टेस्ट', lat: 27.7, lng: 85.3 }];
+  const incidents = [
+    { zone: 'test-zone', type: 'theft', ts: Date.UTC(2026, 8, 30, 10) },
+    { zone: 'test-zone', type: 'theft', ts: Date.UTC(2026, 8, 30, 22) },
+  ];
+  const result = computeZones({ zones, incidents, types: INCIDENT_TYPES, now });
+  assert.equal(result[0].peakHour, 10);
+});
+
 test('haversine returns zero for identical points', () => {
   const point = { lat: 27.7, lng: 85.3 };
   assert.equal(haversine(point, point), 0);
@@ -82,4 +102,12 @@ test('research models return the same zone keys', () => {
   const models = scoreModels(incidents, zones);
   assert.deepEqual(Object.keys(models['frequency-only']), zones);
   assert.deepEqual(Object.keys(models['current-severity-recency']), zones);
+});
+\n\ntest('zero-score allocation still conserves the requested budget', () => {
+  const zones = ZONES.slice(0, 3).map(zone => ({
+    ...zone, count: 1, score: 0, peakHour: null
+  }));
+  const result = computeAllocation({ zones, officers: 5 });
+  assert.equal(result.zones.reduce((sum, zone) => sum + zone.officers, 0), 5);
+  assert.deepEqual(result.zones.map(zone => zone.officers), [2, 2, 1]);
 });
