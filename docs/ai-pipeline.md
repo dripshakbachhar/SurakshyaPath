@@ -2,22 +2,18 @@
 
 ## Current model classification
 
-The current intelligence implementation is:
+The current intelligence implementation is **STATISTICAL_HEURISTIC**. It is deliberately not described as a neural network, machine-learning model, or generative AI system.
 
-**STATISTICAL_HEURISTIC**
-
-It is deliberately not described as a neural network, machine-learning model, or generative AI system.
-
-## Pipeline
+## Connected pipeline
 
 ```
-validated incident snapshot
+canonical synthetic/live incidents
         |
         v
-data-quality checks
+data-quality gate
         |
         v
-30-day evidence window
+validated 30-day evidence
         |
         +--> zone volume
         +--> incident-type frequency
@@ -26,20 +22,22 @@ data-quality checks
         +--> preceding 7-day volume
         |
         v
-trend + pattern fusion
+risk model (severity × recency)
         |
         v
-structured intelligence contract
+intelligence fusion
         |
-        +--> status
-        +--> summary
-        +--> patterns
-        +--> anomalies
+        +--> observed patterns
         +--> risk factors
-        +--> recommendations
+        +--> trend/anomaly state
         +--> evidence coverage
-        +--> limitations
+        +--> recommendations
+        |
+        v
+dashboard / diagnostics / patrol inputs
 ```
+
+The important invariant is that intelligence consumes the same validated incident snapshot and risk-zone output used by the dashboard; it no longer operates beside an unrelated demo dataset.
 
 ## Status semantics
 
@@ -54,17 +52,6 @@ The reported confidence is an **evidence-coverage indicator**, not a calibrated 
 
 ## Future model integration
 
-A trained ML/neural model can be added behind the same contract after providing:
-
-- documented training data
-- feature schema
-- temporal leakage controls
-- train/test separation
-- model versioning
-- evaluation metrics
-- reproducibility controls
-- calibrated uncertainty/confidence
-- explainability
-- explicit limitations
+A trained ML/neural model can be added behind the same contract after providing documented training data, feature schema, temporal leakage controls, train/test separation, model versioning, evaluation metrics, reproducibility controls, calibrated uncertainty/confidence, explainability, and explicit limitations.
 
 Until those requirements exist, deterministic intelligence is preferable to fabricated AI claims.
