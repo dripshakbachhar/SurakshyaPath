@@ -8,7 +8,7 @@ const TYPE_META={
   infrastructure:{label:'Infrastructure Issue',icon:'⚠️',color:'#38bdf8'}
 };
 const BAND_COLOR={low:'#22c55e',moderate:'#eab308',high:'#f97316',critical:'#ef4444'};
-const state={reports:[],zones:[],types:{},analytics:null,stats:null,pick:null,tab:'overview',loading:false};
+const state={reports:[],zones:[],types:{},analytics:null,stats:null,intelligence:null,dataQuality:null,pick:null,tab:'overview',loading:false};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
@@ -51,6 +51,23 @@ function renderHourChart(values){const root=$('#chart-hour');if(!root)return;con
 function renderTrendChart(values){const root=$('#chart-trend');if(!root)return;const nums=values.map(d=>Number(d.count)||0),max=Math.max(...nums,1);root.innerHTML=`<div class="trend-chart">${values.map((d,i)=>`<button class="trend-point" data-index="${i}" style="left:${nums.length===1?50:i/(nums.length-1)*100}%;bottom:${nums[i]/max*82+8}%"><span></span></button>`).join('')}<div class="trend-line"></div><div class="axis"><span>older</span><span>today</span></div></div>`;root.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{const d=values[Number(b.dataset.index)];openAnalyticsDetail(`Day ${d.day} of 30`,`<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p>Daily count in the rolling 30-day dashboard snapshot.</p>`);});}
 function drawCharts(a){if(a){renderTypeChart(a.byType);renderHourChart(a.byHour);renderTrendChart(a.byDay);}}
 
+function renderIntelligence(){
+  const i=state.intelligence;
+  const status=$('#intelligence-status');
+  if(!status)return;
+  if(!i){
+    status.textContent='Intelligence unavailable';
+    status.className='intel-status error';
+    return;
+  }
+  status.textContent=i.status==='SUCCESS'?'INTELLIGENCE READY':i.status.replaceAll('_',' ');
+  status.className='intel-status '+String(i.status).toLowerCase();
+  $('#intelligence-summary').innerHTML=`<div class="intel-card"><span>Analytical status</span><b>${esc(i.summary)}</b><small>${esc(i.modelType)} · ${esc(i.modelVersion)}</small></div><div class="intel-metrics"><div><span>Evidence</span><b>${i.dataCoverage?.analyzedRecords??0}</b><small>validated 30-day records</small></div><div><span>Coverage</span><b>${Math.round((i.confidence||0)*100)}%</b><small>evidence-coverage indicator</small></div><div><span>Trend</span><b>${esc(i.trend?.direction||'—')}</b><small>7-day vs prior 7-day</small></div></div>`;
+  $('#intelligence-patterns').innerHTML=(i.patterns||[]).map(p=>`<div class="intel-row">• ${esc(p)}</div>`).join('')||'<div class="intel-row muted">No validated pattern available.</div>';
+  $('#intelligence-recommendations').innerHTML=(i.recommendations||[]).map(r=>`<div class="intel-row"><b>${esc(r.zone||'System')}</b><span>${esc(r.reason)}</span></div>`).join('')||'<div class="intel-row muted">No recommendation is supported by the current evidence.</div>';
+  const q=state.dataQuality||{};
+  $('#intelligence-evidence').innerHTML=`<div class="intel-evidence-grid"><span>Received <b>${q.recordsReceived??0}</b></span><span>Accepted <b>${q.recordsAccepted??0}</b></span><span>Rejected <b>${q.recordsRejected??0}</b></span><span>Quality <b>${Math.round((q.qualityScore||0)*100)}%</b></span></div><p>${(i.limitations||[]).map(esc).join(' ')}</p>`;
+}
 function renderOverview(){const high=state.stats?.highRiskZones??state.zones.filter(z=>z.band==='high'||z.band==='critical').length;const top=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,5);$('#overview-cards').innerHTML=[['Total records',state.stats?.total??state.reports.length,'all records'],['High-risk zones',high,'high + critical'],['Last 24h',state.analytics?.last24h??0,'recent records'],['30-day records',state.analytics?.last30d??0,'model window']].map(x=>`<button class="overview-card"><span>${esc(x[0])}</span><b>${x[1]}</b><small>${esc(x[2])}</small></button>`).join('');$('#overview-zones').innerHTML=top.map(z=>`<button class="mini-zone" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} reports · ${esc(z.band)}</small></span><strong style="color:${BAND_COLOR[z.band]}">${z.score}</strong></button>`).join('');$('#overview-zones').querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
 
 async function refreshData(){
@@ -62,7 +79,9 @@ async function refreshData(){
     state.zones=Array.isArray(dashboard.zones)?dashboard.zones:[];
     state.analytics=dashboard.analytics||null;
     state.stats=dashboard.stats||null;
-    renderOverview();renderMapZones();drawZones();drawMarkers();drawHeat();renderZoneList();updateStats();
+    state.intelligence=dashboard.intelligence||null;
+    state.dataQuality=dashboard.dataQuality||null;
+    renderOverview();renderIntelligence();renderMapZones();drawZones();drawMarkers();drawHeat();renderZoneList();updateStats();
     if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));
     $('#connection').textContent='LIVE';$('#connection').className='connection live';
   }catch(err){$('#connection').textContent='OFFLINE';$('#connection').className='connection offline';toast(err.message||'Could not load dashboard.',false);}
@@ -71,7 +90,7 @@ async function refreshData(){
 function renderZoneList(){const el=$('#zone-list');if(!el)return;const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score));el.innerHTML=zones.map(z=>`<li><button class="zone-item" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} reports · ${z.last24h} today · peak ${z.peakHour===null?'—':String(z.peakHour).padStart(2,'0')+':00'}</small></span><strong class="badge ${esc(z.band)}">${z.score}</strong></button></li>`).join('');el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
 function updateStats(){const s=state.stats||{};$('#stat-total').textContent=s.total??state.reports.length;$('#stat-zones').textContent=s.activeZones??state.zones.filter(z=>z.count>0).length;$('#stat-critical').textContent=s.highRiskZones??state.zones.filter(z=>z.band==='high'||z.band==='critical').length;$('#stat-night').textContent=(s.nightShare??0)+'%';}
 
-function setTab(tab){state.tab=tab;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$$('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${tab}`));$('#panel').scrollTop=0;map.invalidateSize();if(tab==='analytics'&&state.analytics)requestAnimationFrame(()=>drawCharts(state.analytics));$('#map-mode').textContent=tab==='report'?'Click anywhere on the map to pin an anonymous report.':'Click a zone or incident marker to open more information.';}
+function setTab(tab){state.tab=tab;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$$('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${tab}`));$('#panel').scrollTop=0;map.invalidateSize();if(tab==='analytics'&&state.analytics)requestAnimationFrame(()=>drawCharts(state.analytics));if(tab==='intelligence')renderIntelligence();$('#map-mode').textContent=tab==='report'?'Click anywhere on the map to pin an anonymous report.':'Click a zone or incident marker to open more information.';}
 $('#tabs').onclick=e=>{const b=e.target.closest('.tab');if(b)setTab(b.dataset.tab);};document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b)setTab(b.dataset.go);});$$('[data-stat]').forEach(b=>b.onclick=()=>setTab(b.dataset.stat==='total'?'overview':b.dataset.stat==='night'?'analytics':'risk'));
 
 $('#report-form').onsubmit=async e=>{
