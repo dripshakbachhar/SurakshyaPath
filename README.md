@@ -37,7 +37,7 @@ Dashboard + reproducible experiments
 - 🚔 Nearest-neighbour patrol routing with route-sensitivity experiments
 - 👮 Largest-remainder proportional allocation experiments
 - 📈 Timing, frequency, and trend analytics
-- 🧠 Explainable intelligence layer with explicit data-quality and evidence states
+- 🧠 Explainable intelligence layer connected to the same canonical dataset and live risk model
 - 🔎 Diagnostics endpoints for data, pipeline, model, and storage visibility
 - 🔁 Deterministic synthetic-data generation
 - ✅ Node.js unit tests + deterministic validation
@@ -135,7 +135,7 @@ The purpose is sensitivity analysis: measuring how explicit modelling choices pr
 
 ## Data provenance
 
-The repository currently contains **1,567 synthetic spatial records** representing a Shrawan 2083 experimental scenario. Aggregate official statistics are treated as contextual reference data, not as geocoded incident records.
+The repository currently contains **1,567 synthetic spatial records** representing a Shrawan 2083 experimental scenario. The dashboard now consumes these same canonical records instead of maintaining a separate 180-record demo seed. Aggregate official statistics are treated as contextual reference data, not as geocoded incident records.
 
 See:
 
@@ -175,7 +175,8 @@ The patrol experiments use great-circle coordinate distance, not road-network tr
 - Zero-score allocation inputs use a deterministic equal-share fallback
 - Server shutdown is graceful
 - Local runtime data remains ignored by Git
-- CI runs tests, validation, research generation, and figure generation
+- CI runs tests, validation, end-to-end smoke checks, research generation, and figure generation
+- Dashboard, risk, analytics, intelligence, patrol, and allocation consume the same incident snapshot
 
 ## Project status
 
@@ -219,8 +220,8 @@ For a non-default port, use `PORT=4000 npm run local`.
 
 ### Intelligence and diagnostics
 
-The dashboard now exposes `/api/intelligence`, `/api/data-quality`, and `/api/diagnostics`. The intelligence layer is deliberately classified as `STATISTICAL_HEURISTIC`, not a trained neural network. It combines validated observations, temporal comparisons, and zone/type frequency into an explainable contract with explicit `NO_DATA`, `INSUFFICIENT_DATA`, `PARTIAL_SUCCESS`, and `SUCCESS` states.
+The dashboard now exposes `/api/intelligence`, `/api/data-quality`, and `/api/diagnostics`. The intelligence layer is deliberately classified as `STATISTICAL_HEURISTIC`, not a trained neural network. It consumes the canonical 1,567-record synthetic dataset, passes records through the data-quality gate, and receives the same risk-zone output used by the dashboard. It combines validated observations, temporal comparisons, and zone/type frequency into an explainable contract with explicit `NO_DATA`, `INSUFFICIENT_DATA`, `PARTIAL_SUCCESS`, and `SUCCESS` states.
 
 The end-to-end smoke test starts the real server, checks health, verifies seeded data and intelligence, creates a report, and confirms the new record propagates back into the dashboard/intelligence snapshot.
 
-The application is intentionally a local/research prototype. The security controls documented in `SECURITY.md` are not a production deployment baseline.
+The application is intentionally a local/research prototype. `vercel.json` and `api/index.js` provide a deployment adapter for the Express API, but durable incident persistence still requires an external data store on serverless infrastructure. The security controls documented in `SECURITY.md` are not a production deployment baseline.
