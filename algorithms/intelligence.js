@@ -45,7 +45,7 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
     if (id) seen.add(id);
 
     const check = classifyRecord(incident, zonesById, now);
-    if (isDuplicate) check.reasons.push('duplicate id');
+    if (isDuplicate) { check.reasons.push('duplicate id'); check.valid = false; }
     if (!check.valid) {
       rejected.push({ index, id: id || null, reasons: check.reasons });
       if (check.reasons.includes('timestamp is in the future')) futureDates++;
