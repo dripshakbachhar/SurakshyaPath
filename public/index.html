@@ -32,6 +32,7 @@
     <button class="tab" data-tab="risk">Risk map</button>
     <button class="tab" data-tab="patrol">Patrol</button>
     <button class="tab" data-tab="analytics">Analytics</button>
+    <button class="tab" data-tab="intelligence">Intelligence</button>
   </nav>
 
   <section class="stats-bar" aria-label="Dashboard summary">
@@ -120,6 +121,19 @@
         <button id="p-generate" class="btn primary">Generate patrol plan</button>
         <div id="route-card" class="route-card hidden"></div>
         <div id="alloc-card" class="alloc-card hidden"></div>
+      </section>
+
+      <section id="panel-intelligence" class="panel">
+        <div class="panel-heading"><div><span class="eyebrow">Explainable intelligence</span><h2>What does the data say?</h2></div></div>
+        <p class="muted">This layer fuses validated observations, temporal patterns and zone frequency into an explainable analytical summary. It is not a trained neural network.</p>
+        <div id="intelligence-status" class="intel-status">Loading intelligence…</div>
+        <div id="intelligence-summary" class="intel-summary"></div>
+        <div class="section-title">Observed patterns</div>
+        <div id="intelligence-patterns" class="intel-list"></div>
+        <div class="section-title">Recommendations</div>
+        <div id="intelligence-recommendations" class="intel-list"></div>
+        <div class="section-title">Evidence &amp; limitations</div>
+        <div id="intelligence-evidence" class="intel-evidence"></div>
       </section>
 
       <section id="panel-analytics" class="panel">

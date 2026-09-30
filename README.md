@@ -37,6 +37,8 @@ Dashboard + reproducible experiments
 - 🚔 Nearest-neighbour patrol routing with route-sensitivity experiments
 - 👮 Largest-remainder proportional allocation experiments
 - 📈 Timing, frequency, and trend analytics
+- 🧠 Explainable intelligence layer with explicit data-quality and evidence states
+- 🔎 Diagnostics endpoints for data, pipeline, model, and storage visibility
 - 🔁 Deterministic synthetic-data generation
 - ✅ Node.js unit tests + deterministic validation
 - 🤖 GitHub Actions CI for code and research reproducibility
@@ -98,6 +100,7 @@ npm test
 npm run validate
 npm run research
 npm run figures
+npm run smoke
 ```
 
 Research experiment commands:
@@ -213,5 +216,11 @@ curl http://localhost:3000/api/health
 ```
 
 For a non-default port, use `PORT=4000 npm run local`.
+
+### Intelligence and diagnostics
+
+The dashboard now exposes `/api/intelligence`, `/api/data-quality`, and `/api/diagnostics`. The intelligence layer is deliberately classified as `STATISTICAL_HEURISTIC`, not a trained neural network. It combines validated observations, temporal comparisons, and zone/type frequency into an explainable contract with explicit `NO_DATA`, `INSUFFICIENT_DATA`, `PARTIAL_SUCCESS`, and `SUCCESS` states.
+
+The end-to-end smoke test starts the real server, checks health, verifies seeded data and intelligence, creates a report, and confirms the new record propagates back into the dashboard/intelligence snapshot.
 
 The application is intentionally a local/research prototype. The security controls documented in `SECURITY.md` are not a production deployment baseline.
