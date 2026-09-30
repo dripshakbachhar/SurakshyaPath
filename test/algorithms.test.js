@@ -103,7 +103,9 @@ test('research models return the same zone keys', () => {
   assert.deepEqual(Object.keys(models['frequency-only']), zones);
   assert.deepEqual(Object.keys(models['current-severity-recency']), zones);
 });
-\n\ntest('zero-score allocation still conserves the requested budget', () => {
+
+
+test('zero-score allocation still conserves the requested budget', () => {
   const zones = ZONES.slice(0, 3).map(zone => ({
     ...zone, count: 1, score: 0, peakHour: null
   }));
