@@ -23,13 +23,15 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run unit tests
+      - name: Check research lab JavaScript syntax
+        run: npm run check:research-lab
+      - name: Run reproducible research pipeline
+        run: npm run research
+      - name: Generate research figures
+        run: npm run figures
+      - name: Run unit and research API tests
         run: npm test
       - name: Run deterministic validation
         run: npm run validate
       - name: Run end-to-end application smoke test
         run: npm run smoke
-      - name: Run reproducible research pipeline
-        run: npm run research
-      - name: Generate research figures
-        run: npm run figures
