@@ -97,32 +97,26 @@ function renderRoutes(routes) {
 function renderRobustness(payload) {
   const ids = Object.keys(MODEL_LABELS);
   $('#robustness-summary').innerHTML = ids.map((id) => {
-    const rows = payload.results.map((scenario) => scenario.models[id]);
-    const topZones = [...new Set(rows.map((row) => row.top_zone))];
-    const shifts = rows.map((row) => {
-      const reference = scenarioModel(payload, row, 'frequency-only');
-      return Number(row.mean_absolute_rank_shift ?? rankShiftFromOrders(row.rank_order, reference.rank_order));
-    });
-    const allocationChanges = rows.map((row) => {
-      const reference = scenarioModel(payload, row, 'frequency-only');
-      return Object.keys(row.allocation || {}).filter((zone) =>
-        row.allocation[zone] !== reference.allocation[zone]
-      ).length;
-    });
+    const scenarios = payload.results.map((scenario) => ({
+      model: scenario.models[id],
+      baseline: scenario.models['frequency-only']
+    }));
+    const topZones = [...new Set(scenarios.map((item) => item.model.top_zone))];
+    const shifts = scenarios.map((item) =>
+      rankShiftFromOrders(item.model.rank_order, item.baseline.rank_order)
+    );
+    const allocationChanges = scenarios.map((item) =>
+      Object.keys(item.model.allocation || {}).filter((zone) =>
+        item.model.allocation[zone] !== item.baseline.allocation[zone]
+      ).length
+    );
     const shiftRange = `${fmt(Math.min(...shifts), 1)}–${fmt(Math.max(...shifts), 1)}`;
     const allocationRange = `${Math.min(...allocationChanges)}–${Math.max(...allocationChanges)}`;
     const topText = topZones.length === 1
       ? `${topZones[0]} (5/5)`
-      : topZones.map((zone) => `${zone} (${rows.filter((row) => row.top_zone === zone).length}/5)`).join('; ');
+      : topZones.map((zone) => `${zone} (${scenarios.filter((item) => item.model.top_zone === zone).length}/5)`).join('; ');
     return `<tr><td>${MODEL_LABELS[id]}</td><td>${topText}</td><td>${shiftRange}</td><td>${allocationRange}</td></tr>`;
   }).join('');
-}
-
-function scenarioModel(payload, row, modelId) {
-  const scenario = payload.results.find((item) => item.seed === payload.results.find((result) => result.models[Object.keys(result.models)[0]] === row)?.seed);
-  if (scenario?.models?.[modelId]) return scenario.models[modelId];
-  const owner = payload.results.find((result) => result.models[modelId] && result.models[modelId].allocation);
-  return owner.models[modelId];
 }
 
 function rankShiftFromOrders(order, baseline) {
