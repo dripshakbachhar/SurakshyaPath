@@ -15,9 +15,17 @@ test('read-only research API returns the manuscript experiment artifacts', async
   });
 
   const base = `http://127.0.0.1:${server.address().port}`;
+  const home = await fetch(`${base}/`);
+  assert.equal(home.status, 200);
+  assert.match(await home.text(), /url=\/research-lab\//);
+
   const page = await fetch(`${base}/research-lab/`);
   assert.equal(page.status, 200);
   assert.match(await page.text(), /SurakshyaPath Research Lab/);
+
+  const legacy = await fetch(`${base}/legacy/`);
+  assert.equal(legacy.status, 200);
+  assert.match(await legacy.text(), /Experimental incident analysis/);
 
   const endpoints = ['overview', 'models', 'allocation', 'routes', 'robustness'];
   const responses = await Promise.all(endpoints.map(async (name) => {
