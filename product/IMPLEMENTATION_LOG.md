@@ -36,3 +36,29 @@
 - [x] Added a regression assertion for this exact budget-20 difference to `test/research-api.test.js`.
 
 **Manuscript correction required:** revise the paragraph before Table VII so it states that the recency-weighted model matches frequency-only at budgets 6 and 12, but differs at budget 20 at Chabahil and Bouddha. Do not change the experiment outputs to fit the prose.
+
+## 2026-11-07 — Research Lab interactive experience
+
+### Completed slices
+
+- [x] Added and tested `GET /api/research/{overview,models,allocation,routes,robustness}`.
+- [x] Added an all-zone scoring explorer for all four models.
+- [x] Added per-zone allocation comparison for the stored 6, 12, and 20 unit budgets.
+- [x] Added per-model nearest-neighbour and 2-opt route sequences alongside the canonical distance comparison.
+- [x] Added per-seed robustness comparison, with explicit synthetic-scenario caveats.
+- [x] Reworked the four research figures to be generated from canonical model and experiment outputs.
+- [x] Published the same figure assets to `research/figures/` and `public/research-lab/assets/`.
+- [x] Promoted the Research Lab to the primary `/` entry point; preserved the previous dashboard at `/legacy/`.
+- [x] Added `product/WORKFLOW.md` and a repeatable quality workflow in GitHub Actions.
+- [x] Added tests for model completeness, allocation budget conservation, the known 20-unit recency difference, route-order integrity, static SVG assets, and primary/legacy entry points.
+
+### Workflow and failure diagnosis
+
+- A first SVG asset assertion used an over-escaped character class and failed to match the whitespace after the SVG root element.
+- Root cause was in the test regex, not the figure files. The assertion was rewritten to match an explicit whitespace-or-angle-bracket alternative.
+- CI was reordered so the research pipeline and figure generation run before the API and static-asset tests.
+- Subsequent runs passed the syntax check, research generation, figure generation, unit/API tests, deterministic validation, and end-to-end smoke test.
+
+### Current boundary
+
+The Research Lab remains read-only and uses synthetic research data. No data-generation rules, canonical outputs, experiment parameters, or validated algorithms were changed. Vercel production deployment has intentionally not been performed; it remains the final release phase after preview verification.
