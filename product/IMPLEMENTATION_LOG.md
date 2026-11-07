@@ -62,3 +62,10 @@
 ### Current boundary
 
 The Research Lab remains read-only and uses synthetic research data. No data-generation rules, canonical outputs, experiment parameters, or validated algorithms were changed. Vercel production deployment has intentionally not been performed; it remains the final release phase after preview verification.
+
+### Vercel function-boundary review
+
+- Official Vercel documentation confirms that JavaScript files placed under the root `api/` directory are treated as function entry points by default.
+- The research router was therefore moved from `api/research.js` to `routes/research.js`; only `api/index.js` remains as the intended Express function entry point.
+- Updated the Express mount and syntax-check command. This avoids a utility router being deployed as an additional standalone function.
+- No production deployment has been started.
