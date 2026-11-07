@@ -4,10 +4,10 @@ Build this as small vertical slices. Do not change the synthetic dataset, model 
 
 ## Slice 0 — Research integrity and baseline
 
-- [ ] Verify the manuscript's canonical tables against committed CSV/JSON outputs.
-- [ ] Add automated checks for dataset row count, model keys, canonical top zones, allocation totals, and route comparison metrics.
-- [ ] Keep research severity configuration separate from the legacy dashboard severity configuration.
-- [ ] Record a baseline test/CI result before frontend changes.
+- [x] Verify the manuscript's canonical tables against committed CSV/JSON outputs.
+- [x] Add automated checks for dataset row count, model keys, canonical top zones, allocation totals, and route comparison metrics.
+- [x] Keep research severity configuration separate from the legacy dashboard severity configuration.
+- [x] Record a baseline test/CI result before frontend changes.
 
 **Acceptance:** `npm test`, `npm run validate`, `npm run smoke`, and `npm run research` pass; any generated result diff is understood and intentionally reviewed.
 
@@ -28,8 +28,10 @@ Proposed read-only contracts (exact names can be settled while implementing):
 - [ ] Add a dedicated research-lab frontend without replacing the existing site until the new slice is validated.
 - [ ] Establish a consistent type scale, spacing system, color tokens, reusable cards, tabs, and chart containers.
 - [ ] Create the Overview and Scoring Models pages first.
-- [ ] Add responsive behavior for narrow screens and keyboard/focus states.
-- [ ] Place the synthetic-data and research-only disclosure in a persistent, visible location.
+- [x] Add responsive behavior for narrow screens and keyboard/focus states.
+- [x] Place the synthetic-data and research-only disclosure in a persistent, visible location.
+- [x] Add an interactive all-zone model explorer and stored-budget allocation comparison.
+- [x] Generate and integrate four figures from canonical research outputs.
 
 **Acceptance:** a reader can see the research question, dataset metadata, and four-model comparison on desktop and mobile; no number is hard-coded if it exists in the API contract.
 
