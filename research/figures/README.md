@@ -1,16 +1,19 @@
 # Research figures
 
-Generated directly from the deterministic robustness experiment output.
+Generated from canonical research-model scores and committed deterministic experiment results.
 
-## Figures
+- `risk-model-comparison.svg` — normalized score heatmap for all four models and ten zones.
+- `allocation-comparison.svg` — all per-zone allocation vectors at budgets 6, 12, and 20.
+- `patrol-comparison.svg` — nearest-neighbour versus 2-opt route distances for the canonical seed.
+- `robustness-comparison.svg` — per-seed rank shifts and allocation changes across five designed scenarios.
 
-- `risk-model-comparison.svg` — top-zone consistency across five synthetic seeds.
-- `allocation-comparison.svg` — aggregate allocation changes across five seeds.
-- `robustness-comparison.svg` — mean absolute rank shift across five seeds.
-- `patrol-comparison.svg` — mean patrol distance across five seeds.
+The same generated figures are copied to `public/research-lab/assets/` for the read-only Research Lab website.
 
-Generate with:
+Regenerate with:
 
-    npm.cmd run figures
+```bash
+npm run research
+npm run figures
+```
 
-All figures are descriptive visualizations of a synthetic computational experiment. They do not establish real-world crime risk, operational effectiveness, or universal superiority of any model.
+All graphics describe synthetic algorithm outputs. They are not forecasts, field evidence, road-network navigation, or operational guidance.

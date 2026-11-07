@@ -15,7 +15,8 @@
     "validate": "node scripts/validate.js",
     "robustness-experiments": "node experiments/run-robustness-experiments.js",
     "figures": "node experiments/generate-figures.js",
-    "smoke": "node scripts/smoke.js"
+    "smoke": "node scripts/smoke.js",
+    "check:research-lab": "node --check routes/research.js && node --check public/research-lab/app.js && node --check experiments/generate-figures.js"
   },
   "engines": {
     "node": ">=18"

@@ -12,6 +12,7 @@ const { computePatrol: computePatrolFromModel } = require('./algorithms/routing'
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
 const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
+const researchRouter = require('./routes/research');
 
 const app = express();
 app.disable('x-powered-by');
@@ -24,6 +25,7 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
+app.use('/api/research', researchRouter);
 app.use(express.static(path.join(__dirname, 'public')));
 
 const STATIONS = [
