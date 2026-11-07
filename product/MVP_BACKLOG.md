@@ -11,7 +11,7 @@ Build this as small vertical slices. Do not change the synthetic dataset, model 
 
 **Acceptance:** `npm test`, `npm run validate`, `npm run smoke`, and `npm run research` pass; any generated result diff is understood and intentionally reviewed.
 
-## Slice 1 — Read-only research API <badge>complete</badge>
+## Slice 1 — Read-only research API (complete)
 
 Implemented read-only contracts:
 
