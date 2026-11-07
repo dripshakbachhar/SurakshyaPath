@@ -33,6 +33,13 @@ test('read-only research API returns the manuscript experiment artifacts', async
   assert.equal(overview.dataset.dataStatus, 'SYNTHETIC');
   assert.equal(overview.dataset.spatialUnits, 10);
 
+  for (const asset of ['risk-model-comparison.svg', 'allocation-comparison.svg', 'patrol-comparison.svg', 'robustness-comparison.svg']) {
+    const response = await fetch(`${base}/research-lab/assets/${asset}`);
+    assert.equal(response.status, 200, `${asset} should be served`);
+    assert.match(response.headers.get('content-type') || '', /image\/svg\+xml|text\/xml/);
+    assert.match(await response.text(), /<svg[\\s>]/);
+  }
+
   assert.deepEqual(
     models.models.map((model) => model.id),
     ['frequency-only', 'severity-only', 'frequency-severity', 'current-severity-recency']
