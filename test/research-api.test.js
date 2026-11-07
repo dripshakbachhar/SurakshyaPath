@@ -37,12 +37,29 @@ test('read-only research API returns the manuscript experiment artifacts', async
     models.models.map((model) => model.id),
     ['frequency-only', 'severity-only', 'frequency-severity', 'current-severity-recency']
   );
+
+  for (const model of models.models) {
+    assert.equal(model.zones.length, 10, `${model.id} should score all ten zones`);
+    assert.deepEqual(
+      [...model.zones].sort((a, b) => a.rank - b.rank).map((zone) => zone.rank),
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    );
+    assert.equal(Math.max(...model.zones.map((zone) => zone.score)), 100);
+  }
   assert.equal(models.models.find((model) => model.id === 'frequency-only').topZone, 'Bouddha');
   assert.equal(models.models.find((model) => model.id === 'severity-only').topZone, 'Thamel');
 
   assert.ok(allocation.officerCounts.includes(6));
   assert.ok(allocation.officerCounts.includes(12));
   assert.ok(allocation.officerCounts.includes(20));
+
+  for (const budget of ['6', '12', '20']) {
+    for (const modelId of ['frequency-only', 'severity-only', 'frequency-severity', 'current-severity-recency']) {
+      const vector = allocation.models[modelId][budget];
+      assert.equal(Object.values(vector).reduce((sum, value) => sum + value, 0), Number(budget));
+      assert.equal(Object.keys(vector).length, 10);
+    }
+  }
 
   const frequency20 = allocation.models['frequency-only']['20'];
   const recency20 = allocation.models['current-severity-recency']['20'];
