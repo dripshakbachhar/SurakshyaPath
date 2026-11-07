@@ -237,9 +237,38 @@
       <p class="caution-note"><strong>How to read this:</strong> the five seeds are deterministic designed scenarios, not independent field observations, a representative sample, or a confidence interval.</p>
     </section>
 
+    <section class="section-block" id="figures" aria-labelledby="figures-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">05 / Visual evidence</p>
+          <h2 id="figures-title">The experiment, made visible</h2>
+          <p>These figures are generated from the canonical model files and stored experiment outputs.</p>
+        </div>
+        <span class="section-index">FIGURES</span>
+      </div>
+      <div class="figure-grid">
+        <figure class="figure-card">
+          <img src="assets/risk-model-comparison.svg" alt="Heatmap comparing normalized scores for four models across ten configured zones." loading="lazy" />
+          <figcaption><strong>Fig. 1 · Model scores</strong><span>Four normalized scoring rules across all ten zones.</span></figcaption>
+        </figure>
+        <figure class="figure-card">
+          <img src="assets/allocation-comparison.svg" alt="Allocation vectors for each model and budgets of six, twelve, and twenty units." loading="lazy" />
+          <figcaption><strong>Fig. 2 · Allocation vectors</strong><span>Per-zone integer outputs under the three stored budgets.</span></figcaption>
+        </figure>
+        <figure class="figure-card">
+          <img src="assets/patrol-comparison.svg" alt="Paired bars comparing nearest-neighbour and two-opt geometric route distances." loading="lazy" />
+          <figcaption><strong>Fig. 3 · Route comparison</strong><span>Open-route great-circle distances for the canonical scenario.</span></figcaption>
+        </figure>
+        <figure class="figure-card">
+          <img src="assets/robustness-comparison.svg" alt="Five seed-level rank-shift measurements for each of the four models." loading="lazy" />
+          <figcaption><strong>Fig. 4 · Scenario robustness</strong><span>Per-seed rank shifts and allocation changes.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
     <section class="methods-block" id="methods" aria-labelledby="methods-title">
       <div>
-        <p class="eyebrow">05 / Method and interpretation</p>
+        <p class="eyebrow">06 / Method and interpretation</p>
         <h2 id="methods-title">Reproducible does not mean predictive.</h2>
         <p>The experiment makes its assumptions inspectable: records are generated from a fixed seed, assigned to the nearest configured zone centre in latitude–longitude space, normalized against the maximum score, then passed through shared ranking, allocation, and routing procedures.</p>
       </div>
