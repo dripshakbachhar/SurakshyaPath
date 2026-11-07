@@ -4,6 +4,16 @@
 
 > **Research safety note:** the current spatial dataset is synthetic. SurakshyaPath is an experimental system, not a crime-prediction product and not an operational policing recommendation engine.
 
+## Manuscript-aligned Research Lab
+
+The read-only Research Lab presents the four scoring models and the committed allocation, route-comparison, and robustness experiments used by the manuscript.
+
+- Open locally at **http://localhost:3000/research-lab/** after `npm run local`.
+- Research API: `/api/research/overview`, `/models`, `/allocation`, `/routes`, and `/robustness`.
+- Product scope, implementation decisions, and the MVP backlog live in `product/`.
+
+The existing homepage at `/` is retained as a legacy dashboard prototype. Its report submission and live-dashboard scoring workflow is separate from the manuscript's synthetic research experiments. Do not interpret either interface's synthetic outputs as real-world incident forecasts, staffing advice, or operational patrol guidance.
+
 ## Why this project exists
 
 SurakshyaPath studies a practical systems question:
