@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f5f7fb" />
+  <meta name="description" content="Explore SurakshyaPath's reproducible synthetic-data experiments in explainable scoring, allocation, and route-order sensitivity." />
+  <title>SurakshyaPath Research Lab</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#overview" aria-label="SurakshyaPath Research Lab home">
+      <span class="brand-mark">SP</span>
+      <span class="brand-copy">
+        <strong>SurakshyaPath</strong>
+        <small>Research Lab</small>
+      </span>
+    </a>
+    <nav class="main-nav" aria-label="Research sections">
+      <a href="#models">Scoring models</a>
+      <a href="#allocation">Allocation</a>
+      <a href="#routing">Route experiment</a>
+      <a href="#robustness">Robustness</a>
+      <a href="#methods">Methods</a>
+    </nav>
+    <div class="topbar-status">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="api-status" role="status">Connecting to research API</span>
+    </div>
+  </header>
+
+  <main class="page-shell" id="overview">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">A reproducible computational study</p>
+        <h1>When the formula changes,<br /><em>what changes downstream?</em></h1>
+        <p class="hero-description">
+          Explore how four transparent scoring rules flow through spatial ranking,
+          fixed-budget allocation, and a geometric route-order experiment—all on
+          the same deterministic synthetic dataset.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#models">Explore the models <span aria-hidden="true">↘</span></a>
+          <a class="text-link" href="#methods">Read the method</a>
+        </div>
+      </div>
+      <aside class="hero-note">
+        <span class="note-icon" aria-hidden="true">i</span>
+        <div>
+          <strong>Research simulation only</strong>
+          <p>These outputs are not crime forecasts, field observations, fairness evidence, or operational recommendations.</p>
+        </div>
+      </aside>
+    </section>
+
+    <section class="dataset-strip" aria-labelledby="dataset-title">
+      <div class="dataset-heading">
+        <div>
+          <p class="eyebrow">The experimental baseline</p>
+          <h2 id="dataset-title">One dataset. Four models. Shared downstream rules.</h2>
+        </div>
+        <span class="data-label"><span></span> Synthetic data</span>
+      </div>
+      <div class="metric-grid">
+        <article class="metric-card">
+          <span class="metric-value" id="record-count">—</span>
+          <span class="metric-label">Synthetic records</span>
+          <small>Canonical dataset</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-value" id="zone-count">—</span>
+          <span class="metric-label">Configured zones</span>
+          <small>Nearest-centre assignment</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-value" id="model-count">—</span>
+          <span class="metric-label">Scoring models</span>
+          <small>Transparent arithmetic rules</small>
+        </article>
+        <article class="metric-card">
+          <span class="metric-value" id="seed-count">—</span>
+          <span class="metric-label">Deterministic seeds</span>
+          <small>Designed scenarios</small>
+        </article>
+      </div>
+      <p class="provenance-line" id="provenance-note">Loading dataset provenance…</p>
+    </section>
+
+    <section class="section-block" id="models" aria-labelledby="models-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">01 / Scoring assumptions</p>
+          <h2 id="models-title">Four ways to describe a zone</h2>
+          <p>Each model uses the same assigned records. Only the aggregation rule changes.</p>
+        </div>
+        <span class="section-index">01—04</span>
+      </div>
+
+      <div class="formula-grid">
+        <article class="formula-card">
+          <span class="formula-number">M1</span>
+          <h3>Frequency-only</h3>
+          <p class="formula">F<sub>j</sub> = n<sub>j</sub></p>
+          <p class="formula-note">Counts records assigned to each configured zone.</p>
+        </article>
+        <article class="formula-card">
+          <span class="formula-number">M2</span>
+          <h3>Severity-only</h3>
+          <p class="formula">V<sub>j</sub> = mean(s<sub>i</sub>)</p>
+          <p class="formula-note">Uses the average configured severity for that zone.</p>
+        </article>
+        <article class="formula-card">
+          <span class="formula-number">M3</span>
+          <h3>Frequency × severity</h3>
+          <p class="formula">A<sub>j</sub> = Σ s<sub>i</sub></p>
+          <p class="formula-note">Aggregates configured severity across assigned records.</p>
+        </article>
+        <article class="formula-card">
+          <span class="formula-number">M4</span>
+          <h3>Severity × recency</h3>
+          <p class="formula">R<sub>j</sub> = Σ s<sub>i</sub> · max(0.15, 1 − a<sub>i</sub>/30)</p>
+          <p class="formula-note">Applies the fixed 30-day linear age weight and 0.15 floor.</p>
+        </article>
+      </div>
+
+      <div class="comparison-panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Canonical model comparison</h3>
+            <p>Normalized scores and ranking are read from the committed research outputs.</p>
+          </div>
+          <span class="unit-label">0–100 normalized scale</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th scope="col">Model</th><th scope="col">Top-ranked zone</th><th scope="col">Zones with rank change</th><th scope="col">Mean absolute rank shift</th></tr>
+            </thead>
+            <tbody id="model-summary">
+              <tr><td colspan="4" class="loading-cell">Loading model results…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="model-visuals" id="model-visuals" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="results-grid">
+      <article class="result-panel" id="allocation">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">02 / Integer apportionment</p>
+            <h2>Allocation sensitivity</h2>
+          </div>
+          <span class="section-index">E3</span>
+        </div>
+        <p class="panel-intro">A largest-remainder rule converts normalized scores into integer outputs for the stored budgets.</p>
+        <div class="allocation-highlight" id="allocation-highlight">
+          <span class="highlight-number">—</span>
+          <div><strong>Canonical 12-unit comparison</strong><small>Loading the stored result…</small></div>
+        </div>
+        <div id="allocation-list" class="compact-list"></div>
+        <p class="fine-print">Algorithmic unit counts only—not staffing guidance or a recommendation for any real organization.</p>
+      </article>
+
+      <article class="result-panel" id="routing">
+        <div class="section-heading compact">
+          <div>
+            <p class="eyebrow">03 / Geometric route comparison</p>
+            <h2>Nearest neighbour vs. 2-opt</h2>
+          </div>
+          <span class="section-index">E4</span>
+        </div>
+        <p class="panel-intro">The experiment compares open-route great-circle distance across each model's five highest-ranked zones.</p>
+        <div class="route-table-wrap">
+          <table class="route-table">
+            <thead><tr><th scope="col">Model</th><th scope="col">Nearest</th><th scope="col">2-opt</th><th scope="col">Change</th></tr></thead>
+            <tbody id="route-summary"><tr><td colspan="4" class="loading-cell">Loading route results…</td></tr></tbody>
+          </table>
+        </div>
+        <p class="fine-print">Configured-point geometry only. Not road distance, travel time, navigation, route safety, or an operational plan.</p>
+      </article>
+    </section>
+
+    <section class="section-block" id="robustness" aria-labelledby="robustness-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">04 / Designed scenario variation</p>
+          <h2 id="robustness-title">Does the pattern persist across seeds?</h2>
+          <p>The repository stores five deterministic scenarios with the same record count and scoring assumptions.</p>
+        </div>
+        <span class="section-index">E2</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Model</th><th scope="col">Top zone across seeds</th><th scope="col">Mean rank-shift range</th><th scope="col">Allocation-change range</th></tr></thead>
+          <tbody id="robustness-summary"><tr><td colspan="4" class="loading-cell">Loading robustness results…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="caution-note"><strong>How to read this:</strong> the five seeds are deterministic designed scenarios, not independent field observations, a representative sample, or a confidence interval.</p>
+    </section>
+
+    <section class="methods-block" id="methods" aria-labelledby="methods-title">
+      <div>
+        <p class="eyebrow">05 / Method and interpretation</p>
+        <h2 id="methods-title">Reproducible does not mean predictive.</h2>
+        <p>The experiment makes its assumptions inspectable: records are generated from a fixed seed, assigned to the nearest configured zone centre in latitude–longitude space, normalized against the maximum score, then passed through shared ranking, allocation, and routing procedures.</p>
+      </div>
+      <div class="methods-facts">
+        <div><span>Canonical seed</span><strong>208304</strong></div>
+        <div><span>Research severity</span><strong>2 / 1 / 3 / 1</strong></div>
+        <div><span>Allocation method</span><strong>Largest remainder</strong></div>
+        <div><span>Route distance</span><strong>Haversine · 6371 km</strong></div>
+      </div>
+    </section>
+
+    <section class="limits-banner" aria-label="Research limitations">
+      <span class="limits-icon" aria-hidden="true">!</span>
+      <div>
+        <strong>Scope boundary</strong>
+        <p>SurakshyaPath is a synthetic computational testbed. It does not estimate future incidents, validate a public-safety measure, establish fairness, infer causality, or recommend real-world staffing or patrol activity.</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div><strong>SurakshyaPath Research Lab</strong><span>Reproducible methods · Inspectable assumptions · Synthetic inputs</span></div>
+      <a href="https://github.com/dripshakbachhar/SurakshyaPath" target="_blank" rel="noreferrer">Repository <span aria-hidden="true">↗</span></a>
+    </footer>
+  </main>
+</body>
+</html>
