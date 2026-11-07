@@ -8,6 +8,7 @@ The product direction is a polished, reproducible **research lab** that makes th
 
 - [Product brief](PRODUCT_BRIEF.md) — audience, product promise, scope, and guardrails.
 - [MVP backlog](MVP_BACKLOG.md) — the smallest complete, testable build sequence.
+- [Development workflow](WORKFLOW.md) — the repeatable implement, diagnose, test, commit, and verify loop.
 - [Architecture decisions](DECISIONS.md) — decisions that protect the research and keep the first release small.
 - [Implementation log](IMPLEMENTATION_LOG.md) — audit findings and build progress.
 
