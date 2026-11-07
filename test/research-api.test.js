@@ -37,7 +37,7 @@ test('read-only research API returns the manuscript experiment artifacts', async
     const response = await fetch(`${base}/research-lab/assets/${asset}`);
     assert.equal(response.status, 200, `${asset} should be served`);
     assert.match(response.headers.get('content-type') || '', /image\/svg\+xml|text\/xml/);
-    assert.match(await response.text(), /<svg[\\s>]/);
+    assert.match(await response.text(), /<svg(?:\s|>)/);
   }
 
   assert.deepEqual(
