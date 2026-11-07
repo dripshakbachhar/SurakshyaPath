@@ -1,0 +1,66 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { app } = require('../server');
+
+test('read-only research API returns the manuscript experiment artifacts', async (t) => {
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(async () => {
+    await new Promise((resolve) => {
+      server.close(resolve);
+      server.closeAllConnections?.();
+    });
+  });
+
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const endpoints = ['overview', 'models', 'allocation', 'routes', 'robustness'];
+  const responses = await Promise.all(endpoints.map(async (name) => {
+    const response = await fetch(`${base}/api/research/${name}`);
+    assert.equal(response.status, 200, `/${name} should return HTTP 200`);
+    return response.json();
+  }));
+
+  const [overview, models, allocation, routes, robustness] = responses;
+
+  assert.equal(overview.dataset.recordCount, 1567);
+  assert.equal(overview.dataset.canonicalSeed, 208304);
+  assert.equal(overview.dataset.dataStatus, 'SYNTHETIC');
+  assert.equal(overview.dataset.spatialUnits, 10);
+
+  assert.deepEqual(
+    models.models.map((model) => model.id),
+    ['frequency-only', 'severity-only', 'frequency-severity', 'current-severity-recency']
+  );
+  assert.equal(models.models.find((model) => model.id === 'frequency-only').topZone, 'Bouddha');
+  assert.equal(models.models.find((model) => model.id === 'severity-only').topZone, 'Thamel');
+
+  assert.ok(allocation.officerCounts.includes(6));
+  assert.ok(allocation.officerCounts.includes(12));
+  assert.ok(allocation.officerCounts.includes(20));
+
+  assert.equal(routes.models['frequency-only'].nearestNeighbourKm, 23.62);
+  assert.equal(routes.models['frequency-only'].optimizedKm, 22.31);
+  assert.equal(routes.models['severity-only'].savingsPercent, 0);
+
+  assert.deepEqual(robustness.seeds, [208304, 208305, 208306, 208307, 208308]);
+  assert.equal(robustness.results.length, 5);
+});
+
+test('research endpoints are read-only and do not accept incident submissions', async (t) => {
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  t.after(async () => {
+    await new Promise((resolve) => {
+      server.close(resolve);
+      server.closeAllConnections?.();
+    });
+  });
+
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/research/overview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ incident: 'not accepted' })
+  });
+
+  assert.equal(response.status, 404);
+});
