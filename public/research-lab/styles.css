@@ -173,3 +173,18 @@ td:first-child { font-weight: 700; color: var(--navy); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; }
 }
+
+/* Interactive research explorers */
+.interactive-explorer{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
+.explorer-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:13px}
+.explorer-heading h4{margin:0;color:var(--navy);font-size:12px}
+.explorer-heading p{margin:5px 0 0;color:var(--muted);font-size:10px;line-height:1.5}
+.inline-select{display:grid;gap:5px;min-width:190px;margin:0;color:var(--muted);font-size:9px;font-weight:700}
+.inline-select select{width:100%;min-height:36px;padding:8px 30px 8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink);font:inherit;font-size:10px}
+.score-cell{display:grid;grid-template-columns:45px minmax(70px,1fr);align-items:center;gap:10px;font-variant-numeric:tabular-nums}
+.score-cell>span{font-weight:700;color:var(--navy)}
+.allocation-controls{margin:15px 0 10px}
+.allocation-table td,.allocation-table th{text-align:center;padding-left:8px;padding-right:8px}
+.allocation-table td:first-child,.allocation-table th:first-child{text-align:left}
+.total-row td{border-top:2px solid var(--line);background:#f7f9fb;color:var(--navy);font-weight:800}
+@media(max-width:680px){.explorer-heading{align-items:stretch;flex-direction:column}.inline-select{min-width:0;width:100%}.score-cell{grid-template-columns:40px minmax(65px,1fr);gap:7px}}
