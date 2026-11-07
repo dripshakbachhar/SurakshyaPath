@@ -180,6 +180,22 @@
           <span class="highlight-number">—</span>
           <div><strong>Canonical 12-unit comparison</strong><small>Loading the stored result…</small></div>
         </div>
+        <div class="explorer-heading allocation-controls">
+          <div><h4>Compare all zones</h4><p>Select one of the experiment's stored allocation budgets.</p></div>
+          <label class="inline-select" for="budget-picker">Fixed budget
+            <select id="budget-picker">
+              <option value="6">6 units</option>
+              <option value="12" selected>12 units</option>
+              <option value="20">20 units</option>
+            </select>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table class="allocation-table">
+            <thead><tr><th scope="col">Zone</th><th scope="col">Frequency</th><th scope="col">Severity</th><th scope="col">Freq. × sev.</th><th scope="col">Recency</th></tr></thead>
+            <tbody id="allocation-rows"><tr><td colspan="5" class="loading-cell">Loading allocation vectors…</td></tr></tbody>
+          </table>
+        </div>
         <div id="allocation-list" class="compact-list"></div>
         <p class="fine-print">Algorithmic unit counts only—not staffing guidance or a recommendation for any real organization.</p>
       </article>
