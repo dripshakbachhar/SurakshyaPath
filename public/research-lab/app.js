@@ -140,6 +140,16 @@ function renderRoutes(routes) {
       <td>${fmt(item.savingsPercent)}%</td>
     </tr>`;
   }).join('');
+
+  $('#route-order-list').innerHTML = MODEL_IDS.map((id) => {
+    const item = routes.models[id];
+    const formatOrder = (order) => order.map(escapeHtml).join(' <span aria-hidden="true">→</span> ');
+    return `<article class="route-order-card">
+      <strong>${escapeHtml(MODEL_LABELS[id])}</strong>
+      <div><span>Nearest-neighbour order</span><p>${formatOrder(item.nearestNeighbourOrder || [])}</p></div>
+      <div><span>2-opt order</span><p>${formatOrder(item.optimizedOrder || [])}</p></div>
+    </article>`;
+  }).join('');
 }
 
 function renderRobustness(payload) {
