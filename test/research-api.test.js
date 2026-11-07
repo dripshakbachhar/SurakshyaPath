@@ -84,6 +84,12 @@ test('read-only research API returns the manuscript experiment artifacts', async
   assert.equal(routes.models['frequency-only'].optimizedKm, 22.31);
   assert.equal(routes.models['severity-only'].savingsPercent, 0);
 
+  for (const modelId of ['frequency-only', 'severity-only', 'frequency-severity', 'current-severity-recency']) {
+    assert.equal(routes.models[modelId].nearestNeighbourOrder.length, 5);
+    assert.equal(routes.models[modelId].optimizedOrder.length, 5);
+    assert.equal(routes.models[modelId].nearestNeighbourOrder.sort().join('|'), routes.models[modelId].optimizedOrder.slice().sort().join('|'));
+  }
+
   assert.deepEqual(robustness.seeds, [208304, 208305, 208306, 208307, 208308]);
   assert.equal(robustness.results.length, 5);
 });
