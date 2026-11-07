@@ -44,6 +44,18 @@ test('read-only research API returns the manuscript experiment artifacts', async
   assert.ok(allocation.officerCounts.includes(12));
   assert.ok(allocation.officerCounts.includes(20));
 
+  const frequency20 = allocation.models['frequency-only']['20'];
+  const recency20 = allocation.models['current-severity-recency']['20'];
+  assert.equal(frequency20.Chabahil, 0);
+  assert.equal(frequency20.Bouddha, 6);
+  assert.equal(recency20.Chabahil, 1);
+  assert.equal(recency20.Bouddha, 5);
+  assert.equal(
+    Object.keys(frequency20).filter((zone) => frequency20[zone] !== recency20[zone]).length,
+    2,
+    'recency and frequency allocations differ only in Chabahil and Bouddha at budget 20'
+  );
+
   assert.equal(routes.models['frequency-only'].nearestNeighbourKm, 23.62);
   assert.equal(routes.models['frequency-only'].optimizedKm, 22.31);
   assert.equal(routes.models['severity-only'].savingsPercent, 0);
