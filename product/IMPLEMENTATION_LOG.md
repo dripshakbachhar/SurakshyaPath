@@ -27,3 +27,12 @@
 
 - `feat/research-lab-foundation` — product workspace and MVP scope.
 - Initial change is documentation only. No research data, algorithms, legacy endpoints, or existing UI files have been changed.
+
+### Manuscript cross-check follow-up — allocation budget sweep
+
+- [x] Confirmed Table VII allocation vectors against `experiments/results/allocation/allocation-summary.json` and `allocation-comparison.csv`.
+- [x] Identified one prose inconsistency in the manuscript: paragraph before Table VII says frequency-only, frequency×severity, and severity×recency share vectors at every budget.
+- [x] Repository evidence shows recency matches frequency at budgets 6 and 12, but at budget 20 differs at exactly two zones: Chabahil (1 vs. 0) and Bouddha (5 vs. 6). Table VII itself gives the correct vectors.
+- [x] Added a regression assertion for this exact budget-20 difference to `test/research-api.test.js`.
+
+**Manuscript correction required:** revise the paragraph before Table VII so it states that the recency-weighted model matches frequency-only at budgets 6 and 12, but differs at budget 20 at Chabahil and Bouddha. Do not change the experiment outputs to fit the prose.
