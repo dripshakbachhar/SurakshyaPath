@@ -12,7 +12,7 @@ const { computePatrol: computePatrolFromModel } = require('./algorithms/routing'
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
 const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
-const researchRouter = require('./api/research');
+const researchRouter = require('./routes/research');
 
 const app = express();
 app.disable('x-powered-by');
