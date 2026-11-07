@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+const path = require('node:path');
 const { app } = require('../server');
 
 test('read-only research API returns the manuscript experiment artifacts', async (t) => {
@@ -13,6 +15,10 @@ test('read-only research API returns the manuscript experiment artifacts', async
   });
 
   const base = `http://127.0.0.1:${server.address().port}`;
+  const page = await fetch(`${base}/research-lab/`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /SurakshyaPath Research Lab/);
+
   const endpoints = ['overview', 'models', 'allocation', 'routes', 'robustness'];
   const responses = await Promise.all(endpoints.map(async (name) => {
     const response = await fetch(`${base}/api/research/${name}`);
@@ -63,4 +69,9 @@ test('research endpoints are read-only and do not accept incident submissions', 
   });
 
   assert.equal(response.status, 404);
+});
+
+test('research lab browser script is syntactically valid', () => {
+  const scriptPath = path.join(__dirname, '..', 'public', 'research-lab', 'app.js');
+  execFileSync(process.execPath, ['--check', scriptPath], { stdio: 'pipe' });
 });
