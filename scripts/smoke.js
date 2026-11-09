@@ -2,6 +2,10 @@
 
 const { spawn } = require('node:child_process');
 const net = require('node:net');
+const { ZONES } = require('../config/zones');
+const { INCIDENT_TYPES } = require('../config/incident-types');
+const { computeZones } = require('../algorithms/risk');
+const { hasEventHourPrecision } = require('../algorithms/temporal');
 
 function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -54,10 +58,11 @@ async function json(base, path, options) {
     if (!Array.isArray(before.incidents) || before.incidents.length < 1500) throw new Error('Dashboard is not connected to the canonical synthetic dataset.');
     if (before.incidents.filter(incident => incident.dataStatus === 'SYNTHETIC').length < 1500) throw new Error('Canonical synthetic records are not connected to the dashboard.');
     if (before.zones.reduce((sum, zone) => sum + zone.count, 0) !== before.incidents.length) throw new Error('Risk zone counts are disconnected from dashboard incidents.');
-    if (before.analytics.byHour !== null || before.analytics.last24h !== null) throw new Error('Age-only synthetic records exposed unsupported event-hour or last-24-hour analytics.');
-    if (before.stats.nightShare !== null || before.stats.eventHourAvailable !== false) throw new Error('Age-only synthetic records exposed an unsupported night-share metric.');
-    if (!before.zones.every(zone => zone.peakHour === null && zone.last24h === null)) throw new Error('Age-only synthetic records produced zone-level event-hour metrics.');
-    if (before.intelligence.temporalPrecision?.eventHourAvailable !== false) throw new Error('Intelligence exposed event-hour availability for age-only synthetic records.');
+    const syntheticOnly = before.incidents.filter(incident => incident.dataStatus === 'SYNTHETIC');
+    if (!syntheticOnly.every(incident => incident.eventTimePrecision === 'DAY' && incident.timestampKind === 'SYNTHETIC_RECENCY_ANCHOR')) throw new Error('Canonical synthetic records are missing their day-level temporal provenance.');
+    if (syntheticOnly.some(hasEventHourPrecision)) throw new Error('Age-only synthetic records were classified as event-hour observations.');
+    const syntheticZones = computeZones({ zones: ZONES, incidents: syntheticOnly, types: INCIDENT_TYPES, days: 30, now: Date.now() });
+    if (!syntheticZones.every(zone => zone.peakHour === null && zone.last24h === null)) throw new Error('Age-only synthetic records produced zone-level event-hour metrics.');
     if (intelligence.status !== 'SUCCESS' || !intelligence.modelVersion) throw new Error('Intelligence pipeline did not reach SUCCESS.');
     if (!intelligence.riskFactors?.some(factor => factor.factor === 'risk_score')) throw new Error('Intelligence is not consuming risk-model output.');
     if (quality.recordsAccepted < 1) throw new Error('Data-quality pipeline accepted no records.');
@@ -70,6 +75,7 @@ async function json(base, path, options) {
 
     const after = await json(base, '/api/dashboard');
     if (!created.id || created.dataStatus !== 'LIVE') throw new Error('Incident creation returned an incomplete live-data record.');
+    if (created.eventTimePrecision !== 'MINUTE' || !hasEventHourPrecision(created)) throw new Error('A just-now community report was not marked as minute-precision.');
     if (after.incidents.length !== before.incidents.length + 1) throw new Error('Created incident did not propagate to dashboard state.');
     if (after.dataQuality.recordsAccepted !== after.incidents.length) throw new Error('Created incident did not pass the data-quality gate.');
     if (!after.intelligence || after.intelligence.dataCoverage.analyzedRecords < 1) throw new Error('Created incident did not propagate to intelligence.');
