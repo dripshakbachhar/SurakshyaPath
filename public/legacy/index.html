@@ -40,7 +40,7 @@
     <button class="stat stat-click" data-stat="total"><span id="stat-total" class="num">—</span><span><b>Research records</b><small>all dashboard incidents</small></span></button>
     <button class="stat stat-click" data-stat="zones"><span id="stat-zones" class="num">—</span><span><b>Active zones</b><small>zones with reports</small></span></button>
     <button class="stat stat-click" data-stat="critical"><span id="stat-critical" class="num">—</span><span><b>High-risk zones</b><small>high + critical bands</small></span></button>
-    <button class="stat stat-click" data-stat="night"><span id="stat-night" class="num">—</span><span><b>Night share</b><small>20:00–04:00 local time</small></span></button>
+    <button class="stat stat-click" data-stat="night"><span id="stat-night" class="num">—</span><span><b>Night share · timestamped subset</b><small>minute-precision reports only · Kathmandu time</small></span></button>
   </section>
 
   <main class="workspace">
@@ -126,7 +126,7 @@
 
       <section id="panel-intelligence" class="panel">
         <div class="panel-heading"><div><span class="eyebrow">Explainable intelligence</span><h2>What does the data say?</h2></div></div>
-        <p class="muted">This layer fuses validated observations, temporal patterns and zone frequency into an explainable analytical summary. It is not a trained neural network.</p>
+        <p class="muted">This layer summarizes validated records and day-level recency. Event-hour patterns are shown only when minute-precision timestamps are available. It is not a trained neural network.</p>
         <div id="intelligence-status" class="intel-status">Loading intelligence…</div>
         <div id="intelligence-summary" class="intel-summary"></div>
         <div class="section-title">Observed patterns</div>
@@ -138,10 +138,10 @@
       </section>
 
       <section id="panel-analytics" class="panel">
-        <div class="panel-heading"><div><span class="eyebrow">Research view</span><h2>Timing &amp; frequency</h2></div></div>
+        <div class="panel-heading"><div><span class="eyebrow">Research view</span><h2>Time precision &amp; frequency</h2></div></div>
         <p class="muted">Charts are interactive. Click a segment, hour, or day to open the underlying metric.</p>
         <div class="chart-box"><div class="chart-title"><h3>Incidents by type</h3><span>Click a segment</span></div><div id="chart-type" class="chart" role="img" aria-label="Incidents by type"></div></div>
-        <div class="chart-box"><div class="chart-title"><h3>Hour of day</h3><span>Click a bar</span></div><div id="chart-hour" class="chart" role="img" aria-label="Incidents by hour"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Hour of day · minute-precision records</h3><span>Timestamped subset only</span></div><div id="chart-hour" class="chart" role="img" aria-label="Incidents by hour"></div></div>
         <div class="chart-box"><div class="chart-title"><h3>Last 30 days</h3><span>Click a day</span></div><div id="chart-trend" class="chart" role="img" aria-label="Incidents over the last 30 days"></div></div>
       </section>
     </aside>
