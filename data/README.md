@@ -9,3 +9,7 @@ The current spatial layer is **synthetic** and exists for algorithm testing. It 
 - The synthetic generator is deterministic so the experiment can be reproduced without claiming that the generated coordinates are real observations.
 
 See `data/data_sources.md` for provenance and limitations.
+
+## Temporal precision
+
+The canonical CSV provides integer `age_days` and a month-level date label. It does not contain minute- or hour-level event timestamps. Runtime timestamps derived from `age_days` are recency anchors only, not observed event times. They must not be used to infer event-hour, nighttime, or rolling 24-hour patterns.
