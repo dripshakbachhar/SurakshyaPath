@@ -44,7 +44,6 @@ function precisionForReportWindow(window) {
   if (window === undefined || window === null || window === 'now') return 'MINUTE';
   if (window === 'today') return 'DAY';
   if (window === 'week') return 'WEEK';
-  if (window === 'month') return 'MONTH';
   return 'UNKNOWN';
 }
 
