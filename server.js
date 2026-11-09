@@ -11,6 +11,7 @@ const { computeZones: computeZonesFromModel } = require('./algorithms/risk');
 const { computePatrol: computePatrolFromModel } = require('./algorithms/routing');
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
 const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
+const { EVENT_TIME_ZONE, hasEventHourPrecision, getEventHour, getAgeDays } = require('./algorithms/temporal');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
 const researchRouter = require('./routes/research');
 
@@ -166,7 +167,10 @@ app.post('/api/incidents', (req, res) => {
   const zone = nearestZone(lat, lng);
   const incident = {
     id: 'incident-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
-    zone: zone.id, type, severity: TYPES[type].severity, ts: incidentTimestamp(when), reporter: 'Anonymous',
+    zone: zone.id, type, severity: TYPES[type].severity, ts: incidentTimestamp(when),
+    eventTimePrecision: when === 'now' ? 'MINUTE' : when === 'today' ? 'DAY' : 'WEEK',
+    reportedTimeWindow: when,
+    reporter: 'Anonymous',
     note: typeof note === 'string' ? note.trim().slice(0, MAX_REPORT_NOTE_LENGTH) || sampleNotes[type][0] : sampleNotes[type][0],
     sourceType: 'community-report', dataStatus: 'LIVE',
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
@@ -196,26 +200,63 @@ app.get('/api/allocation', (req, res) => {
 });
 
 function buildAnalytics(source, now = Date.now()) {
-  const recent = source.filter(i => now - i.ts >= 0);
-  const last24h = recent.filter(i => now - i.ts < DAY_MS).length;
-  const last7d = recent.filter(i => now - i.ts < 7 * DAY_MS).length;
-  const last30d = recent.filter(i => now - i.ts < 30 * DAY_MS).length;
-  const byType = {}, byHour = Array(24).fill(0), byDay = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, count: 0 }));
+  const recent = source.filter(incident => Number.isFinite(Number(incident.ts)) && now - Number(incident.ts) >= 0);
+  const eventTimeRecords = recent.filter(hasEventHourPrecision);
+  const byType = {};
+  const byHour = Array(24).fill(0);
+  const byDay = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, count: 0 }));
+
   for (const incident of recent) {
     byType[incident.type] = (byType[incident.type] || 0) + 1;
-    byHour[new Date(incident.ts).getHours()]++;
-    const ageDays = Math.floor((now - incident.ts) / DAY_MS);
-    if (ageDays < 30) byDay[29 - ageDays].count++;
+
+    if (hasEventHourPrecision(incident)) {
+      const hour = getEventHour(incident.ts);
+      if (hour !== null) byHour[hour]++;
+    }
+
+    const ageDays = getAgeDays(incident, now);
+    if (ageDays !== null && ageDays < 30) {
+      const bucket = 29 - Math.floor(ageDays);
+      if (bucket >= 0 && bucket < byDay.length) byDay[bucket].count++;
+    }
   }
-  return { total: recent.length, last24h, last7d, last30d, byType, byHour, byDay };
+
+  return {
+    total: recent.length,
+    last24h: eventTimeRecords.length
+      ? eventTimeRecords.filter(incident => now - Number(incident.ts) < DAY_MS).length
+      : null,
+    last7d: recent.filter(incident => getAgeDays(incident, now) < 7).length,
+    last30d: recent.filter(incident => getAgeDays(incident, now) < 30).length,
+    byType,
+    byHour: eventTimeRecords.length ? byHour : null,
+    byDay,
+    temporalPrecision: {
+      eventHourAvailable: eventTimeRecords.length > 0,
+      eventHourRecordCount: eventTimeRecords.length,
+      timeZone: EVENT_TIME_ZONE
+    }
+  };
 }
 function buildStats(source, now) {
-  const window = source.filter(i => now - i.ts >= 0 && now - i.ts < 30 * DAY_MS);
+  const window = source.filter(i => Number.isFinite(Number(i.ts)) && now - Number(i.ts) >= 0 && now - Number(i.ts) < 30 * DAY_MS);
   const activeZones = new Set(window.map(i => i.zone)).size;
   const zones = computeZonesFromModel({ zones: ZONES, incidents: source, types: TYPES, days: 30, now });
   const highRiskZones = zones.filter(z => z.band === 'high' || z.band === 'critical').length;
-  const night = window.filter(i => { const h = new Date(i.ts).getHours(); return h >= 20 || h < 4; }).length;
-  return { total: source.length, activeZones, highRiskZones, nightShare: window.length ? Math.round(night / window.length * 100) : 0 };
+  const eventTimeWindow = window.filter(hasEventHourPrecision);
+  const night = eventTimeWindow.filter(incident => {
+    const hour = getEventHour(incident.ts);
+    return hour !== null && (hour >= 20 || hour < 4);
+  }).length;
+  return {
+    total: source.length,
+    activeZones,
+    highRiskZones,
+    nightShare: eventTimeWindow.length ? Math.round(night / eventTimeWindow.length * 100) : null,
+    nightShareRecordCount: eventTimeWindow.length,
+    eventHourAvailable: eventTimeWindow.length > 0,
+    eventTimeZone: EVENT_TIME_ZONE
+  };
 }
 app.get('/api/analytics', (req, res) => res.json(buildAnalytics(incidents)));
 app.get('/api/data-quality', (req, res) => res.json(buildDataQuality(incidents, ZONES)));
