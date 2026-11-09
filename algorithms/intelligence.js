@@ -154,7 +154,7 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
   if (topRiskZone && peak.hour !== null) {
     recommendations.push({
       zone: topRiskZone.name,
-      reason: `Highest modelled risk is ${topRiskZone.score}/100 from ${topRiskZone.count} validated 30-day records; peak observed hour is ${String(peak.hour).padStart(2, '0')}:00.`,
+      reason: `Highest modelled risk is ${topRiskZone.score}/100 from ${topRiskZone.count} validated 30-day records; peak event hour among ${eventHourRecordCount} minute-precision records (${EVENT_TIME_ZONE}) is ${String(peak.hour).padStart(2, '0')}:00.`,
       priority: topRiskZone.score,
       riskScore: topRiskZone.score,
       confidence
