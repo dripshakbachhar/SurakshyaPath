@@ -54,6 +54,10 @@ async function json(base, path, options) {
     if (!Array.isArray(before.incidents) || before.incidents.length < 1500) throw new Error('Dashboard is not connected to the canonical synthetic dataset.');
     if (before.incidents.filter(incident => incident.dataStatus === 'SYNTHETIC').length < 1500) throw new Error('Canonical synthetic records are not connected to the dashboard.');
     if (before.zones.reduce((sum, zone) => sum + zone.count, 0) !== before.incidents.length) throw new Error('Risk zone counts are disconnected from dashboard incidents.');
+    if (before.analytics.byHour !== null || before.analytics.last24h !== null) throw new Error('Age-only synthetic records exposed unsupported event-hour or last-24-hour analytics.');
+    if (before.stats.nightShare !== null || before.stats.eventHourAvailable !== false) throw new Error('Age-only synthetic records exposed an unsupported night-share metric.');
+    if (!before.zones.every(zone => zone.peakHour === null && zone.last24h === null)) throw new Error('Age-only synthetic records produced zone-level event-hour metrics.');
+    if (before.intelligence.temporalPrecision?.eventHourAvailable !== false) throw new Error('Intelligence exposed event-hour availability for age-only synthetic records.');
     if (intelligence.status !== 'SUCCESS' || !intelligence.modelVersion) throw new Error('Intelligence pipeline did not reach SUCCESS.');
     if (!intelligence.riskFactors?.some(factor => factor.factor === 'risk_score')) throw new Error('Intelligence is not consuming risk-model output.');
     if (quality.recordsAccepted < 1) throw new Error('Data-quality pipeline accepted no records.');
@@ -69,6 +73,7 @@ async function json(base, path, options) {
     if (after.incidents.length !== before.incidents.length + 1) throw new Error('Created incident did not propagate to dashboard state.');
     if (after.dataQuality.recordsAccepted !== after.incidents.length) throw new Error('Created incident did not pass the data-quality gate.');
     if (!after.intelligence || after.intelligence.dataCoverage.analyzedRecords < 1) throw new Error('Created incident did not propagate to intelligence.');
+    if (after.analytics.temporalPrecision?.eventHourAvailable !== true || after.analytics.byHour === null) throw new Error('Minute-precision community report did not enable the timestamped-subset hour metrics.');
 
     console.log('Smoke test passed: health → data → intelligence → create incident → dashboard propagation.');
   } finally {
