@@ -12,18 +12,15 @@ function hasEventHourPrecision(incident) {
   const timestamp = Number(incident.ts);
   if (!Number.isFinite(timestamp)) return false;
 
+  if (incident.dataStatus === 'SYNTHETIC' || incident.sourceType === 'simulation') {
+    return false;
+  }
+
   if (incident.eventTimePrecision !== undefined && incident.eventTimePrecision !== null) {
     return incident.eventTimePrecision === 'MINUTE';
   }
 
-  if (
-    incident.dataStatus === 'SYNTHETIC' ||
-    incident.sourceType === 'simulation' ||
-    incident.sourceType === 'community-report'
-  ) {
-    return false;
-  }
-
+  if (incident.sourceType === 'community-report') return false;
   return true;
 }
 
