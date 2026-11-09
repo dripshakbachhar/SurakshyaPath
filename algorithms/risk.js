@@ -11,6 +11,7 @@
 // ============================================================================
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const { hasEventHourPrecision, getEventHour } = require('./temporal');
 
 /**
  * Calculate how much weight an incident receives based on its age.
@@ -104,8 +105,12 @@ function computeZones({
   return rawZones
     .map(({ zone, incidents, raw }) => {
       const hourCounts = new Map();
+      let eventHourRecordCount = 0;
       for (const incident of incidents) {
-        const hour = new Date(incident.ts).getHours();
+        if (!hasEventHourPrecision(incident)) continue;
+        const hour = getEventHour(incident.ts);
+        if (hour === null) continue;
+        eventHourRecordCount++;
         hourCounts.set(hour, (hourCounts.get(hour) || 0) + 1);
       }
 
@@ -130,9 +135,12 @@ function computeZones({
         band: riskBand(score),
         count: incidents.length,
         peakHour,
-        last24h: incidents.filter(
-          (incident) => now - incident.ts < DAY_MS
-        ).length,
+        eventHourRecordCount,
+        last24h: eventHourRecordCount
+          ? incidents.filter((incident) =>
+            hasEventHourPrecision(incident) && now - Number(incident.ts) < DAY_MS
+          ).length
+          : null,
       };
     })
     .sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
