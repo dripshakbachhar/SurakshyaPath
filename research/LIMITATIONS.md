@@ -104,3 +104,10 @@ A stronger future study could:
 6. Add pairwise model comparisons.
 7. Use carefully documented real or validated aggregate datasets where legally and ethically appropriate.
 8. Predefine evaluation metrics before examining outcomes.
+## 6. Event-time precision
+
+The canonical CSV provides integer `age_days` values and a month-level date label; it does not provide event timestamps with minute/hour precision. Runtime recency anchors derived from `age_days` preserve day-level recency calculations but are not observed event times.
+
+Therefore, age-only synthetic records cannot support hour-of-day distributions, peak-hour claims, nighttime shares, or last-24-hour counts. These metrics are unavailable unless records provide minute-precision event timestamps. Coarse community-report windows such as “earlier today” or “within the past week” are also excluded from event-hour analysis. Valid minute-precision event times are interpreted in the explicit `Asia/Kathmandu` timezone.
+
+Day-level recency and 7-/30-day volume comparisons remain available, subject to the synthetic-data limitations above. A timezone conversion cannot recover precision that the source never recorded.
