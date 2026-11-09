@@ -60,7 +60,9 @@ function loadSyntheticIncidents(now = Date.now()) {
       lng: Number(lng.toFixed(5)),
       sourceType: row.source_type,
       dataStatus: row.data_status,
-      ageDays
+      ageDays,
+      eventTimePrecision: 'DAY',
+      timestampKind: 'SYNTHETIC_RECENCY_ANCHOR'
     };
   });
 }
