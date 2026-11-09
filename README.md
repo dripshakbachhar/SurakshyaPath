@@ -12,7 +12,7 @@ The read-only Research Lab presents the four scoring models and the committed al
 - Research API: `/api/research/overview`, `/models`, `/allocation`, `/routes`, and `/robustness`.
 - Product scope, implementation decisions, and the MVP backlog live in `product/`.
 
-The legacy dashboard prototype is available at `/legacy/`. Its report submission and live-dashboard scoring workflow is separate from the manuscript's synthetic research experiments. Do not interpret either interface's synthetic outputs as real-world incident forecasts, staffing advice, or operational patrol guidance.
+The legacy dashboard prototype is available at `/legacy/`. Its report submission and live-dashboard scoring workflow is separate from the manuscript's synthetic research experiments. Day-level synthetic ages do not establish event hours: hour-of-day, night-share, and last-24-hour metrics are unavailable for age-only records. Coarse report windows are excluded from event-hour analysis; only minute-precision timestamps are analyzed in `Asia/Kathmandu`. Do not interpret either interface's synthetic outputs as real-world incident forecasts, staffing advice, or operational patrol guidance.
 
 ## Why this project exists
 
@@ -46,7 +46,7 @@ Dashboard + reproducible experiments
 - 🧪 Frequency, severity, frequency×severity, and severity×recency research models
 - 🚔 Nearest-neighbour patrol routing with route-sensitivity experiments
 - 👮 Largest-remainder proportional allocation experiments
-- 📈 Timing, frequency, and trend analytics
+- 📈 Day-level recency and frequency analytics; event-hour metrics only for minute-precision timestamps
 - 🧠 Explainable intelligence layer connected to the same canonical dataset and live risk model
 - 🔎 Diagnostics endpoints for data, pipeline, model, and storage visibility
 - 🔁 Deterministic synthetic-data generation
