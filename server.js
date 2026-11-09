@@ -11,7 +11,7 @@ const { computeZones: computeZonesFromModel } = require('./algorithms/risk');
 const { computePatrol: computePatrolFromModel } = require('./algorithms/routing');
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
 const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
-const { EVENT_TIME_ZONE, hasEventHourPrecision, getEventHour, getAgeDays } = require('./algorithms/temporal');
+const { EVENT_TIME_ZONE, hasEventHourPrecision, getEventHour, getAgeDays, precisionForReportWindow } = require('./algorithms/temporal');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
 const researchRouter = require('./routes/research');
 
@@ -168,8 +168,8 @@ app.post('/api/incidents', (req, res) => {
   const incident = {
     id: 'incident-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
     zone: zone.id, type, severity: TYPES[type].severity, ts: incidentTimestamp(when),
-    eventTimePrecision: when === 'now' ? 'MINUTE' : when === 'today' ? 'DAY' : 'WEEK',
-    reportedTimeWindow: when,
+    eventTimePrecision: precisionForReportWindow(when),
+    reportedTimeWindow: when || 'now',
     reporter: 'Anonymous',
     note: typeof note === 'string' ? note.trim().slice(0, MAX_REPORT_NOTE_LENGTH) || sampleNotes[type][0] : sampleNotes[type][0],
     sourceType: 'community-report', dataStatus: 'LIVE',
