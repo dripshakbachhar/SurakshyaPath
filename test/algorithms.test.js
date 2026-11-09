@@ -56,11 +56,11 @@ test('peak-hour ties resolve to the earliest hour', () => {
   const now = Date.UTC(2026, 8, 30, 23);
   const zones = [{ id: 'test-zone', name: 'Test', np: 'टेस्ट', lat: 27.7, lng: 85.3 }];
   const incidents = [
-    { zone: 'test-zone', type: 'theft', ts: Date.UTC(2026, 8, 30, 10) },
-    { zone: 'test-zone', type: 'theft', ts: Date.UTC(2026, 8, 30, 22) },
+    { zone: 'test-zone', type: 'theft', ts: Date.UTC(2026, 8, 30, 10), eventTimePrecision: 'MINUTE' },
+    { zone: 'test-zone', type: 'theft', ts: Date.UTC(2026, 8, 30, 22), eventTimePrecision: 'MINUTE' },
   ];
   const result = computeZones({ zones, incidents, types: INCIDENT_TYPES, now });
-  assert.equal(result[0].peakHour, 10);
+  assert.equal(result[0].peakHour, 3);
 });
 
 test('haversine returns zero for identical points', () => {
