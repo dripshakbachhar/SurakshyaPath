@@ -8,6 +8,7 @@
 // ============================================================================
 
 const DAY_MS = 86400000;
+const { EVENT_TIME_ZONE, hasEventHourPrecision, getEventHour } = require('./temporal');
 
 const VALID_TYPES = new Set(['theft', 'suspicious', 'harassment', 'infrastructure']);
 
@@ -97,11 +98,18 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
   const byZone = new Map(zoneList.map(zone => [zone.id, 0]));
   const byType = {};
   const byHour = Array(24).fill(0);
+  let eventHourRecordCount = 0;
 
   for (const incident of recent30) {
     byZone.set(incident.zone, (byZone.get(incident.zone) || 0) + 1);
     byType[incident.type] = (byType[incident.type] || 0) + 1;
-    byHour[new Date(Number(incident.ts)).getHours()]++;
+    if (hasEventHourPrecision(incident)) {
+      const hour = getEventHour(incident.ts);
+      if (hour !== null) {
+        byHour[hour]++;
+        eventHourRecordCount++;
+      }
+    }
   }
 
   const rankedZones = [...byZone.entries()]
@@ -112,10 +120,12 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
     }))
     .sort((a, b) => b.count - a.count || a.zoneId.localeCompare(b.zoneId));
 
-  const peak = byHour.reduce(
-    (best, count, hour) => count > best.count ? { hour, count } : best,
-    { hour: null, count: 0 }
-  );
+  const peak = eventHourRecordCount
+    ? byHour.reduce(
+      (best, count, hour) => count > best.count ? { hour, count } : best,
+      { hour: null, count: 0 }
+    )
+    : { hour: null, count: 0 };
 
   const trendRatio = previous7.length ? recent7.length / previous7.length : null;
   const trend = trendRatio === null
@@ -175,7 +185,9 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
       topZone ? `Highest observed 30-day volume: ${topZone.zone} (${topZone.count}).` : 'No zone pattern is available.',
       topRiskZone ? `Highest modelled risk: ${topRiskZone.name} (${topRiskZone.score}/100, ${topRiskZone.band}).` : 'No risk model output is available.',
       topType ? `Most frequent type: ${types?.[topType[0]]?.label || topType[0]} (${topType[1]}).` : 'No incident-type pattern is available.',
-      peak.hour !== null ? `Peak observed hour: ${String(peak.hour).padStart(2, '0')}:00 (${peak.count} records).` : 'No temporal pattern is available.'
+      peak.hour !== null
+        ? `Peak event hour among ${eventHourRecordCount} minute-precision records (${EVENT_TIME_ZONE}): ${String(peak.hour).padStart(2, '0')}:00 (${peak.count} records).`
+        : 'Event-hour analysis unavailable: the available source records do not provide minute-precision event times.'
     ],
     anomalies: trend === 'INCREASING'
       ? [{ type: 'volume_change', description: 'Recent 7-day volume exceeds the preceding 7-day baseline.' }]
@@ -186,6 +198,11 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
     ],
     recommendations,
     confidence,
+    temporalPrecision: {
+      eventHourAvailable: eventHourRecordCount > 0,
+      eventHourRecordCount,
+      timeZone: EVENT_TIME_ZONE
+    },
     dataCoverage: {
       validRecords: valid.length,
       analyzedRecords: recent30.length,
@@ -201,7 +218,8 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
     limitations: [
       'This is an explainable statistical/heuristic layer, not a trained neural network.',
       'The dashboard dataset is synthetic and must not be interpreted as real incident-level police data.',
-      'Confidence is an evidence-coverage heuristic, not a calibrated probability.'
+      'Confidence is an evidence-coverage heuristic, not a calibrated probability.',
+      'Age-only synthetic records do not contain event-hour precision; hourly and nighttime patterns are unavailable for those records.'
     ]
   };
 }
