@@ -67,18 +67,18 @@ function computeAllocation({
   return {
     officers: budget,
     zones: activeZones.map((zone, index) => {
-      const peak = zone.peakHour;
-      const from = peak !== null
-        ? String((peak + 23) % 24).padStart(2, '0')
-        : '18';
-      const to = peak !== null
-        ? String((peak + 3) % 24).padStart(2, '0')
-        : '22';
+      const peak = Number.isInteger(zone.peakHour) && zone.peakHour >= 0 && zone.peakHour < 24
+        ? zone.peakHour
+        : null;
+      const window = peak === null
+        ? null
+        : `${String((peak + 23) % 24).padStart(2, '0')}:00–${String((peak + 3) % 24).padStart(2, '0')}:00`;
 
       return {
         ...zone,
         officers: assigned[index].floor,
-        window: `${from}:00–${to}:00`,
+        window,
+        windowStatus: window ? 'AVAILABLE' : 'UNAVAILABLE_EVENT_TIME_PRECISION',
       };
     }),
   };
