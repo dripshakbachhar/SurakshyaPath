@@ -30,6 +30,8 @@ function hasEventHourPrecision(incident) {
 function getEventHour(timestamp) {
   const value = Number(timestamp);
   if (!Number.isFinite(value)) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
 
   const formatted = new Intl.DateTimeFormat('en-US', {
     timeZone: EVENT_TIME_ZONE,
@@ -39,6 +41,14 @@ function getEventHour(timestamp) {
 
   const hour = Number(formatted);
   return Number.isInteger(hour) && hour >= 0 && hour < 24 ? hour : null;
+}
+
+function precisionForReportWindow(window) {
+  if (window === undefined || window === null || window === 'now') return 'MINUTE';
+  if (window === 'today') return 'DAY';
+  if (window === 'week') return 'WEEK';
+  if (window === 'month') return 'MONTH';
+  return 'UNKNOWN';
 }
 
 function getAgeDays(incident, now = Date.now()) {
@@ -61,5 +71,6 @@ module.exports = {
   DAY_MS,
   hasEventHourPrecision,
   getEventHour,
-  getAgeDays
+  getAgeDays,
+  precisionForReportWindow
 };
