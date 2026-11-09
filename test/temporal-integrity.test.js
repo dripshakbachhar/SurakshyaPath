@@ -32,6 +32,7 @@ test('age-only synthetic records cannot be treated as event-hour observations', 
   const incident = syntheticAgeOnly(now);
 
   assert.equal(hasEventHourPrecision(incident), false);
+  assert.equal(hasEventHourPrecision({ ...incident, eventTimePrecision: 'MINUTE' }), false);
 
   const zones = computeZones({
     zones: ZONES,
