@@ -19,3 +19,7 @@ The experiment layer asks:
 > How sensitive is geographic prioritization and downstream planning to the assumptions inside a risk-scoring formula?
 
 Results should be interpreted as algorithm experiments on synthetic data, not as evidence about actual crime patterns in Kathmandu Valley.
+
+## Temporal precision
+
+The canonical CSV stores integer `age_days` and a month-level date label; it does not provide event-hour or minute-level timestamps. Any runtime timestamp derived from `age_days` is an internal recency anchor, not an observed event time. Day-level recency comparisons remain available, but event-hour, peak-hour, nighttime-share, and last-24-hour claims are unavailable for these age-only records.
