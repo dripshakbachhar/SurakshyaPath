@@ -143,5 +143,5 @@ test('coarse community-report windows do not qualify for event-hour analysis', (
   assert.equal(precisionForReportWindow('now'), 'MINUTE');
   assert.equal(precisionForReportWindow('today'), 'DAY');
   assert.equal(precisionForReportWindow('week'), 'WEEK');
-  assert.equal(precisionForReportWindow('month'), 'MONTH');
+  assert.equal(precisionForReportWindow('month'), 'UNKNOWN');
 });
