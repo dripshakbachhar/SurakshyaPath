@@ -3,13 +3,11 @@ const assert = require('node:assert/strict');
 
 const { ZONES } = require('../config/zones');
 const { INCIDENT_TYPES } = require('../config/incident-types');
-const { hasEventHourPrecision, getEventHour, EVENT_TIME_ZONE } = require('../algorithms/temporal');
+const { hasEventHourPrecision, getEventHour, EVENT_TIME_ZONE, precisionForReportWindow } = require('../algorithms/temporal');
 const { computeZones } = require('../algorithms/risk');
 const { computeAllocation } = require('../algorithms/allocation');
 const { buildIntelligence } = require('../algorithms/intelligence');
 const { buildAnalytics, buildStats } = require('../server');
-
-const DAY_MS = 86400000;
 
 function syntheticAgeOnly(now) {
   const zone = ZONES[0];
@@ -140,4 +138,9 @@ test('coarse community-report windows do not qualify for event-hour analysis', (
   assert.equal(hasEventHourPrecision({ ...base, eventTimePrecision: 'WEEK' }), false);
   assert.equal(hasEventHourPrecision({ ...base, eventTimePrecision: 'UNKNOWN' }), false);
   assert.equal(hasEventHourPrecision({ ...base, eventTimePrecision: undefined }), false);
+  assert.equal(precisionForReportWindow(undefined), 'MINUTE');
+  assert.equal(precisionForReportWindow('now'), 'MINUTE');
+  assert.equal(precisionForReportWindow('today'), 'DAY');
+  assert.equal(precisionForReportWindow('week'), 'WEEK');
+  assert.equal(precisionForReportWindow('month'), 'MONTH');
 });
