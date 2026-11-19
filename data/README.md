@@ -23,18 +23,33 @@ labels and calculates a centroid for each zone.
 
 Import accepts ISO date-only values as date precision and ISO date-times as exact timestamps. Date-times without an explicit UTC offset are interpreted as UTC. Unknown or legacy timestamps are not promoted to exact times; time-window counts are unavailable when those records could affect the result.
 
-Imported data is stored separately from `incidents.json`, which holds the
-synthetic demo and its community reports. The active dashboard can be switched
-back to that demo without deleting the imported file. The fixed research
-benchmark and its saved results are not changed by imports.
+Imported data is stored separately from the canonical synthetic data and from
+community reports. The active dashboard can be switched back to the synthetic
+demo without deleting the imported file. Community reports are stored in
+`community-reports.json`; the canonical seed and fixed research benchmark are
+not changed by reports or imports. Imported datasets have a stable identifier
+and provenance metadata that remain available when switching datasets.
 
 Uploads are limited to 4 MiB, including the serialized mapped JSON request.
-Local development stores imports as JSON. Vercel deployments without a
-configured durable storage provider are read-only: the synthetic dashboard and
-fixed research results remain available, but importing, switching datasets,
-and submitting community reports are disabled.
+The app supports `local-research` for one researcher on a trusted local
+machine and `public-read-only` for public deployments. Ordinary non-production
+development defaults to local research. Set `SURAKSHYA_MODE=public-read-only`
+to explicitly select read-only behavior; production and detected deployment
+environments are read-only regardless of provider. Unsupported configuration
+fails closed. Local JSON writes are best-effort filesystem persistence, not a
+managed database or a guarantee against machine/storage loss. The server
+binds to loopback by default in local mode.
+
+The browser parses the original file, but mapped records are transmitted to
+the application server when import is submitted. Local JSON imports remain
+stored until manually removed; there is no automatic expiration or
+per-user access control. Anyone with access to the host filesystem or app
+process can access them. Public read-only deployments disable imports,
+switching, and community-report writes. Do not upload personally identifiable
+or sensitive records to an unsecured deployment.
 
 The Research workspace can run the four scoring models, a fixed 12-unit
 allocation, and nearest-neighbour versus 2-opt route-distance comparisons for
 the active import. Multi-seed robustness is not estimated from a single
-dataset.
+dataset. These are experimental research outputs, not validated
+real-world operational instructions or recommendations.
