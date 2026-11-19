@@ -36,9 +36,12 @@ Example shape:
   },
   "storage": {
     "mode": "local-json",
+    "configured": true,
     "available": true,
-    "writable": true,
-    "durable": true,
+    "readable": true,
+    "writable": null,
+    "durable": false,
+    "durability": "Best-effort local filesystem with atomic rename; not a managed database or guaranteed against machine/storage loss.",
     "reason": null
   },
   "model": {
@@ -48,13 +51,18 @@ Example shape:
 }
 ```
 
-`pipeline.storage` remains a compatibility boolean. The `storage` object reports
-the adapter mode, availability, write support, durability classification, and
-any failure reason. Local JSON storage is available for development but is not
-a managed production data service. On Vercel without a configured durable
-provider, the status is `mode: "read-only"` with `available` and `writable`
-false; research reads remain available and write endpoints return `503`.
+The health endpoint also reports `operatingMode` and `mutationPolicy`.
+`pipeline.storage` remains a compatibility boolean. The `storage` object
+reports whether storage is configured, whether reads/writes have actually
+succeeded, availability, and a durability description. Local JSON storage is
+best-effort and is not a managed production database. Before any local write,
+`writable` is `null` (unknown), not verified true; diagnostics do not create
+probe files. If there are no persisted files yet, `readable` and `available`
+can also remain `null` until an operation succeeds. Public-read-only mode reports `configured`, `available`,
+`readable`, and `writable` as false; research reads from the canonical
+synthetic dataset remain available and mutation endpoints return `503`.
 
-Malformed or unreadable local state is reported in `reason` and disables
-persistent writes for that process. The application does not replace corrupt
-state with a success-shaped in-memory fallback.
+The mode applies to deployments beyond Vercel. An unsupported mode setting
+fails closed. Malformed or unreadable local state is reported in `reason` and
+disables persistent writes for that process. The application does not replace
+corrupt state with a success-shaped in-memory fallback.
