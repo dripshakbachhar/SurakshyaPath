@@ -3,7 +3,6 @@
 // ============================================================================
 
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 const { ZONES } = require('./config/zones');
 const { INCIDENT_TYPES: DEMO_TYPES } = require('./config/incident-types');
@@ -16,11 +15,13 @@ const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligen
 const Temporal = require('./public/js/temporal');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
 const { prepareImportedDataset } = require('./data/imported-dataset');
+const { createStorage, PersistentStorageError } = require('./storage/json-storage');
+const ImportLimits = require('./public/js/import-limits');
 const RESEARCH_SUMMARY = require('./experiments/results/summary/research-summary.json');
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: ImportLimits.MAX_IMPORT_PAYLOAD_BYTES }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -37,9 +38,6 @@ const DEMO_STATIONS = [
   { id: 'chabahil', name: 'Chabahil', lat: 27.717, lng: 85.348 }
 ];
 
-const DATA_FILE = path.join(__dirname, 'data', 'incidents.json');
-const USER_DATASET_FILE = path.join(__dirname, 'data', 'imported-dataset.json');
-const ACTIVE_MODE_FILE = path.join(__dirname, 'data', 'active-dataset.json');
 const VALID_REPORT_WINDOWS = new Set(Temporal.REPORT_WINDOWS);
 const MAX_REPORT_NOTE_LENGTH = 280;
 const MAX_INCIDENTS = 50000;
@@ -57,34 +55,43 @@ function seedIncidents(now = Date.now()) {
   return loadSyntheticIncidents(now);
 }
 
-function load() {
+const storage = createStorage();
+let storageFailure = null;
+function storageStatus() {
+  const status = storage.status();
+  return storageFailure
+    ? { ...status, available: false, writable: false, reason: storageFailure.message }
+    : status;
+}
+function recordStorageFailure(error) {
+  storageFailure = {
+    message: error?.message || 'A persistent storage operation failed.',
+    code: error?.code || 'STORAGE_ERROR'
+  };
+  console.error('Persistent storage is unavailable:', error);
+}
+function readStoredValue(key, isValid, label) {
+  if (!storage.status().available) return null;
   try {
-    if (!fs.existsSync(DATA_FILE)) return null;
-    const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    if (!Array.isArray(parsed) || parsed.length > MAX_INCIDENTS) {
-      console.error('Incident data has an invalid shape or exceeds the configured limit.');
-      return null;
+    const value = storage.read(key);
+    if (value !== null && !isValid(value)) {
+      throw new PersistentStorageError(`Stored ${label} has an invalid shape.`, 'STORAGE_INVALID_DATA');
     }
-    return parsed;
+    return value;
   } catch (error) {
-    console.error('Failed to load incident data:', error);
+    recordStorageFailure(error);
     return null;
   }
 }
-function save(data) {
-  try {
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    const temporary = DATA_FILE + '.tmp';
-    fs.writeFileSync(temporary, JSON.stringify(data, null, 2));
-    fs.renameSync(temporary, DATA_FILE);
-    return true;
-  } catch (error) {
-    console.error('Failed to save incident data:', error);
-    try { fs.rmSync(DATA_FILE + '.tmp', { force: true }); } catch {}
-    return false;
-  }
+function isValidImportedDataset(value) {
+  return Boolean(value && typeof value === 'object' &&
+    typeof value.name === 'string' &&
+    Array.isArray(value.records) && value.records.length > 0 && value.records.length <= MAX_INCIDENTS &&
+    Array.isArray(value.zones) && value.zones.length > 0 &&
+    value.zones.every(zone => Number.isFinite(zone.lat) && Number.isFinite(zone.lng)) &&
+    value.types && typeof value.types === 'object' && !Array.isArray(value.types));
 }
-let incidents = load();
+let incidents = readStoredValue('incidents', value => Array.isArray(value) && value.length <= MAX_INCIDENTS, 'incident data');
 const isLegacyRuntimeSeed = Array.isArray(incidents) && incidents.length === 180 && incidents.every(incident => String(incident.id || '').startsWith('seed-'));
 if (!incidents || isLegacyRuntimeSeed) {
   try {
@@ -94,30 +101,23 @@ if (!incidents || isLegacyRuntimeSeed) {
     incidents = [];
   }
 }
+let replaceLegacySeedOnWrite = isLegacyRuntimeSeed;
 let riskCache = null;
 const RISK_CACHE_MS = 60000;
-let persistenceAvailable = save(incidents);
-if (!persistenceAvailable) console.warn('Incident data is running in memory; persistence is unavailable.');
-
-const demoIncidents = incidents;
+let demoIncidents = incidents;
 let importedDataset = null;
 let activeMode = 'demo';
 let savedMode = { mode: 'demo' };
-try {
-  if (fs.existsSync(ACTIVE_MODE_FILE)) savedMode = JSON.parse(fs.readFileSync(ACTIVE_MODE_FILE, 'utf8'));
-  if (!['demo', 'imported'].includes(savedMode.mode)) throw new Error('Stored active dataset mode is invalid.');
-  if (fs.existsSync(USER_DATASET_FILE)) {
-    importedDataset = JSON.parse(fs.readFileSync(USER_DATASET_FILE, 'utf8'));
-    if (!Array.isArray(importedDataset.records) || !Array.isArray(importedDataset.zones) || !importedDataset.types) {
-      throw new Error('Stored imported dataset has an invalid shape.');
-    }
-  }
-  if (savedMode.mode === 'imported' && !importedDataset) throw new Error('Active imported dataset is missing.');
-  activeMode = savedMode.mode;
-} catch (error) {
-  console.error('Failed to restore the active dataset:', error);
-  if (savedMode.mode === 'imported') throw error;
+const storedMode = readStoredValue('activeMode',
+  value => value && typeof value === 'object' && ['demo', 'imported'].includes(value.mode),
+  'active dataset mode');
+if (storedMode) savedMode = storedMode;
+importedDataset = readStoredValue('importedDataset', isValidImportedDataset, 'imported dataset');
+if (savedMode.mode === 'imported' && !importedDataset) {
+  recordStorageFailure(new PersistentStorageError('The active imported dataset is missing or invalid.', 'STORAGE_INVALID_DATA'));
+  savedMode = { mode: 'demo' };
 }
+activeMode = savedMode.mode;
 
 let activeZones = activeMode === 'imported' ? importedDataset.zones : ZONES;
 let activeTypes = activeMode === 'imported' ? importedDataset.types : DEMO_TYPES;
@@ -129,18 +129,20 @@ if (activeMode === 'imported') {
   incidents = importedDataset.records;
 }
 
-function writeJson(file, data) {
-  try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const temporary = file + '.tmp';
-    fs.writeFileSync(temporary, JSON.stringify(data, null, 2));
-    fs.renameSync(temporary, file);
-    return true;
-  } catch (error) {
-    console.error(`Failed to write ${path.basename(file)}:`, error);
-    try { fs.rmSync(file + '.tmp', { force: true }); } catch {}
+function requireWritableStorage(res) {
+  const status = storageStatus();
+  if (!status.writable) {
+    res.status(503).json({
+      error: status.reason || 'Persistent writes are unavailable.',
+      storage: status
+    });
     return false;
   }
+  return true;
+}
+function storageWriteFailure(res, error, message) {
+  recordStorageFailure(error);
+  return res.status(503).json({ error: message, storage: storageStatus() });
 }
 function datasetSummary() {
   return {
@@ -214,7 +216,11 @@ function computeAllocation(officers = 12) {
 }
 
 app.get('/api/health', (req, res) => res.json({
-  ok: true, service: 'SurakshyaPath', version: '1.1.0', timestamp: new Date().toISOString()
+  ok: true,
+  service: 'SurakshyaPath',
+  version: '1.1.0',
+  timestamp: new Date().toISOString(),
+  storage: storageStatus()
 }));
 app.get('/api/config', (req, res) => res.json({ zones: activeZones, stations: activeStations, types: activeTypes }));
 app.get('/api/research/summary', (req, res) => res.json(RESEARCH_SUMMARY));
@@ -228,39 +234,52 @@ app.get('/api/dataset/research', (req, res) => {
 });
 
 app.post('/api/dataset/import', (req, res) => {
+  if (!requireWritableStorage(res)) return;
   let dataset;
   try {
     dataset = prepareImportedDataset(req.body || {});
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
-  if (!writeJson(USER_DATASET_FILE, dataset)) {
-    return res.status(503).json({ error: 'Imported dataset could not be saved.' });
+  try {
+    storage.write('importedDataset', dataset);
+  } catch (error) {
+    return storageWriteFailure(res, error, 'Imported dataset could not be saved.');
   }
   importedDataset = dataset;
-  if (!writeJson(ACTIVE_MODE_FILE, { mode: 'imported' })) {
-    if (activeMode === 'imported') {
-      activateImportedDataset();
-      return res.status(201).json({ dataset: datasetSummary() });
+  if (activeMode !== 'imported') {
+    try {
+      storage.write('activeMode', { mode: 'imported' });
+    } catch (error) {
+      return storageWriteFailure(
+        res,
+        error,
+        'Dataset was saved, but activation failed. The active dataset has not changed.'
+      );
     }
-    return res.status(503).json({ error: 'Dataset was saved but could not be activated. Use the dashboard data selector to try again.' });
   }
   activateImportedDataset();
   res.status(201).json({ dataset: datasetSummary() });
 });
 
 app.post('/api/dataset/use-imported', (req, res) => {
+  if (!requireWritableStorage(res)) return;
   if (!importedDataset) return res.status(404).json({ error: 'No saved imported dataset is available.' });
-  if (!writeJson(ACTIVE_MODE_FILE, { mode: 'imported' })) {
-    return res.status(503).json({ error: 'Dashboard could not switch to the saved imported dataset.' });
+  try {
+    storage.write('activeMode', { mode: 'imported' });
+  } catch (error) {
+    return storageWriteFailure(res, error, 'Dashboard could not switch to the saved imported dataset.');
   }
   activateImportedDataset();
   res.json({ dataset: datasetSummary() });
 });
 
 app.post('/api/dataset/use-demo', (req, res) => {
-  if (!writeJson(ACTIVE_MODE_FILE, { mode: 'demo' })) {
-    return res.status(503).json({ error: 'Dashboard could not switch back to demo data.' });
+  if (!requireWritableStorage(res)) return;
+  try {
+    storage.write('activeMode', { mode: 'demo' });
+  } catch (error) {
+    return storageWriteFailure(res, error, 'Dashboard could not switch back to demo data.');
   }
   activeMode = 'demo';
   activeZones = ZONES;
@@ -276,6 +295,7 @@ app.post('/api/incidents', (req, res) => {
   if (activeMode !== 'demo') {
     return res.status(409).json({ error: 'Community reporting is available only in the synthetic demo workspace.' });
   }
+  if (!requireWritableStorage(res)) return;
   if (incidents.length >= MAX_INCIDENTS) {
     return res.status(503).json({ error: 'Incident storage limit reached.' });
   }
@@ -296,13 +316,29 @@ app.post('/api/incidents', (req, res) => {
     sourceType: 'community-report', dataStatus: 'LIVE',
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
   };
-  incidents.push(incident);
-  if (!save(incidents)) {
-    persistenceAvailable = false;
-    incidents.pop();
-    return res.status(503).json({ error: 'Incident could not be persisted. Please try again.' });
+  let updatedIncidents;
+  try {
+    updatedIncidents = storage.update('incidents', current => {
+      const currentIncidents = replaceLegacySeedOnWrite || current === null ? demoIncidents : current;
+      if (!Array.isArray(currentIncidents) || currentIncidents.length > MAX_INCIDENTS) {
+        throw new PersistentStorageError('Stored incident data has an invalid shape.', 'STORAGE_INVALID_DATA');
+      }
+      if (currentIncidents.length >= MAX_INCIDENTS) {
+        const error = new Error('Incident storage limit reached.');
+        error.code = 'INCIDENT_LIMIT';
+        throw error;
+      }
+      return currentIncidents.concat(incident);
+    }, demoIncidents);
+  } catch (error) {
+    if (error.code === 'INCIDENT_LIMIT') {
+      return res.status(503).json({ error: error.message });
+    }
+    return storageWriteFailure(res, error, 'Incident could not be persisted. Please try again.');
   }
-  persistenceAvailable = true;
+  incidents = updatedIncidents;
+  demoIncidents = updatedIncidents;
+  replaceLegacySeedOnWrite = false;
   riskCache = null;
   res.status(201).json(incident);
 });
@@ -327,10 +363,12 @@ app.get('/api/diagnostics', (req, res) => {
   const now = snapshotNow();
   const quality = buildDataQuality(incidents, activeZones, now, activeTypes);
   const intelligence = buildIntelligence({ incidents, zones: activeZones, riskZones: computeZones(), types: activeTypes, now });
+  const persistence = storageStatus();
   res.json({
     status: intelligence.status,
     data: { records: incidents.length, validRecords: quality.recordsAccepted, qualityScore: quality.qualityScore },
-    pipeline: { storage: persistenceAvailable, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
+    pipeline: { storage: persistence.available, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
+    storage: persistence,
     model: { type: intelligence.modelType, version: intelligence.modelVersion },
     generatedAt: intelligence.generatedAt
   });
@@ -342,13 +380,16 @@ app.get('/api/dashboard', (req, res) => {
   const zones = computeZonesFromModel({ zones: activeZones, incidents: snapshot, types: activeTypes, days: 30, now });
   const intelligence = buildIntelligence({ incidents: snapshot, zones: activeZones, riskZones: zones, types: activeTypes, now });
   const dataQuality = buildDataQuality(snapshot, activeZones, now, activeTypes);
-  res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now, activeZones, activeTypes), intelligence, dataQuality, dataset: datasetSummary(), types: activeTypes, stations: activeStations });
+  res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now, activeZones, activeTypes), intelligence, dataQuality, dataset: datasetSummary(), storage: storageStatus(), types: activeTypes, stations: activeStations });
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
 app.use((error, req, res, next) => {
   if (error?.type === 'entity.parse.failed') return res.status(400).json({ error: 'Malformed JSON request body.' });
-  if (error?.type === 'entity.too.large') return res.status(413).json({ error: 'Request body is too large. Dataset imports are limited to 25 MB.' });
+  if (error?.type === 'entity.too.large') {
+    const limitMiB = ImportLimits.MAX_IMPORT_PAYLOAD_BYTES / (1024 * 1024);
+    return res.status(413).json({ error: `Request body is too large. Dataset requests are limited to ${limitMiB} MiB.` });
+  }
   console.error('Unhandled request error:', error);
   if (res.headersSent) return next(error);
   res.status(500).json({ error: 'Internal server error.' });

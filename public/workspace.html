@@ -108,7 +108,7 @@
         <p class="muted">Import a CSV or JSON incident dataset for dashboard analysis. Files are processed and stored by this app; they are not sent to an external analysis service.</p>
         <div id="dataset-current" class="active-dataset-card" role="status">Loading current dataset…</div>
         <div class="section-title">Import a dataset</div>
-        <p class="dataset-help">Each row must include a zone, category, valid latitude/longitude coordinates and date/time. ISO date-only values (YYYY-MM-DD) stay date-only; ISO date-times with an offset are exact. A date-time without an offset is interpreted as UTC. Severity is optional; when omitted, it defaults to 1.</p>
+        <p class="dataset-help">Each row must include a zone, category, valid latitude/longitude coordinates and date/time. ISO date-only values (YYYY-MM-DD) stay date-only; ISO date-times with an offset are exact. A date-time without an offset is interpreted as UTC. Severity is optional; when omitted, it defaults to 1. Files are limited to 4 MiB, and the mapped JSON request must also fit within 4 MiB.</p>
         <form id="dataset-form">
           <label for="dataset-name">Dataset name</label>
           <input id="dataset-name" type="text" maxlength="80" required placeholder="e.g. Community safety observations" />
@@ -137,6 +137,7 @@
         <div class="panel-heading"><div><span class="eyebrow">Live dashboard tool</span><h2>Submit a report</h2></div></div>
         <p class="research-caveat">Reports update the live dashboard snapshot only; they are not added to the fixed research experiment or its stored results.</p>
         <p class="muted">Choose a point on the map, describe the incident, and submit it without an identity field.</p>
+        <p id="report-storage-note" class="dataset-help" hidden></p>
         <div id="picked-spot" class="picked">📍 Click the map to choose a location.</div>
         <form id="report-form">
           <label for="f-type">What happened?</label>
@@ -256,6 +257,7 @@
   <script src="js/cursor.js"></script>
   <script src="js/temporal.js"></script>
   <script src="js/dataset-import.js"></script>
+  <script src="js/import-limits.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

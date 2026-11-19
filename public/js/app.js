@@ -9,7 +9,9 @@ const TYPE_META={
 };
 const BAND_COLOR={low:'#22c55e',moderate:'#eab308',high:'#f97316',critical:'#ef4444'};
 const Temporal=window.SurakshyaTemporal;
-const state={reports:[],zones:[],types:{},analytics:null,stats:null,intelligence:null,dataQuality:null,dataset:null,datasetKey:null,importDraft:null,datasetResearch:null,pick:null,tab:'overview',loading:false,mobileMapVisible:false};
+const ImportLimits=window.SurakshyaImportLimits;
+const IMPORT_LIMIT_MIB=ImportLimits.MAX_IMPORT_PAYLOAD_BYTES/(1024*1024);
+const state={reports:[],zones:[],types:{},analytics:null,stats:null,intelligence:null,dataQuality:null,dataset:null,storage:null,datasetKey:null,importDraft:null,datasetResearch:null,pick:null,tab:'overview',loading:false,mobileMapVisible:false};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const typeLabel=type=>state.types[type]?.label||TYPE_META[type]?.label||type;
@@ -182,6 +184,7 @@ async function refreshData(){
     state.stats=dashboard.stats||null;
     state.intelligence=dashboard.intelligence||null;
     state.dataQuality=dashboard.dataQuality||null;
+    state.storage=dashboard.storage||{writable:true};
     updateDatasetUI();renderOverview();updateStats();renderIntelligence();renderMapZones();drawZones();drawMarkers();drawHeat();renderZoneList();
     if(datasetChanged&&state.zones.length){
       const bounds=L.latLngBounds(state.zones.map(zone=>[zone.lat,zone.lng]));
@@ -230,14 +233,29 @@ function renderOverview(){
 function updateDatasetUI(){
   const dataset=state.dataset||{};
   const imported=dataset.mode==='imported';
+  const storage=state.storage||{writable:true};
+  const readOnly=storage.writable===false;
+  const reportDisabled=imported||readOnly;
   const reportTab=$('#tab-report');
-  reportTab.disabled=imported;
-  reportTab.title=imported?'Community reporting is available only in the synthetic demo workspace.':'';
-  $('#report-form').querySelectorAll('input,select,textarea,button').forEach(control=>control.disabled=imported);
-  $('.dashboard-action[data-go="report"]').classList.toggle('hidden',imported);
-  $('#dataset-current').innerHTML=`<span>Active dashboard dataset</span><b>${esc(dataset.name||'Synthetic dashboard demo')}</b><small>${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones · ${imported?'Imported data':'Synthetic demo'}</small>`;
+  reportTab.disabled=reportDisabled;
+  reportTab.title=readOnly?(storage.reason||'Community reports are disabled because persistent storage is unavailable.'):imported?'Community reporting is available only in the synthetic demo workspace.':'';
+  $('#report-form').querySelectorAll('input,select,textarea,button').forEach(control=>control.disabled=reportDisabled);
+  $('#report-storage-note').hidden=!readOnly;
+  $('#report-storage-note').textContent=readOnly?(storage.reason||'Community reporting is disabled because persistent storage is unavailable.'):'';
+  $('.dashboard-action[data-go="report"]').classList.toggle('hidden',reportDisabled);
+  $('#dataset-current').innerHTML=`<span>Active dashboard dataset</span><b>${esc(dataset.name||'Synthetic dashboard demo')}</b><small>${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones · ${imported?'Imported data':'Synthetic demo'}</small>${readOnly?`<small>Read-only deployment: ${esc(storage.reason||'persistent storage is unavailable.')}</small>`:''}`;
   $('#use-demo-data').classList.toggle('hidden',!imported);
   $('#use-saved-import').classList.toggle('hidden',imported||!dataset.hasImportedDataset);
+  $('#use-demo-data').disabled=readOnly;
+  $('#use-saved-import').disabled=readOnly;
+  $('#dataset-form').querySelectorAll('input,select,button').forEach(control=>{
+    if(readOnly)control.disabled=true;
+    else if(control.id!=='dataset-import-button')control.disabled=false;
+  });
+  if(readOnly){
+    $('#dataset-import-status').textContent=storage.reason||'Dataset imports are disabled because persistent storage is unavailable.';
+    $('#dataset-import-status').className='dataset-import-status error';
+  }
   $('#dataset-research-run').disabled=!imported;
   if(!state.datasetResearch){
     $('#dataset-research-status').textContent=imported
@@ -293,10 +311,22 @@ function importMapping(){
 }
 function validateImportDraft(){
   const status=$('#dataset-import-status'),button=$('#dataset-import-button');
+  if(state.storage?.writable===false){
+    status.textContent=state.storage.reason||'Dataset imports are disabled because persistent storage is unavailable.';
+    status.className='dataset-import-status error';
+    button.disabled=true;
+    return;
+  }
   if(!state.importDraft){button.disabled=true;return;}
   try{
     const records=DatasetImport.mapRecords(state.importDraft.records,importMapping());
-    if(!$('#dataset-name').value.trim())throw new Error('Enter a dataset name.');
+    const name=$('#dataset-name').value.trim();
+    if(!name)throw new Error('Enter a dataset name.');
+    const body=JSON.stringify({name,records});
+    const bodyBytes=ImportLimits.payloadByteLength(body);
+    if(bodyBytes>ImportLimits.MAX_IMPORT_PAYLOAD_BYTES){
+      throw new Error(`Mapped dataset request is ${(bodyBytes/(1024*1024)).toFixed(2)} MiB; the API limit is ${IMPORT_LIMIT_MIB} MiB.`);
+    }
     status.textContent=`Ready to import ${records.length.toLocaleString()} validated records.`;
     status.className='dataset-import-status success';
     button.disabled=false;
@@ -319,8 +349,8 @@ $('#dataset-file').addEventListener('change',async event=>{
   $('#dataset-import-button').disabled=true;
   $('#dataset-import-status').textContent='';
   if(!file)return;
-  if(file.size>10*1024*1024){
-    $('#dataset-import-status').textContent='Files are limited to 10 MB.';
+  if(file.size>ImportLimits.MAX_IMPORT_PAYLOAD_BYTES){
+    $('#dataset-import-status').textContent=`Files are limited to ${IMPORT_LIMIT_MIB} MiB. The mapped JSON request must also fit within the same API limit.`;
     $('#dataset-import-status').className='dataset-import-status error';
     return;
   }
@@ -355,15 +385,17 @@ IMPORT_FIELDS.forEach(field=>$(`#${field.id}`).addEventListener('change',validat
 $('#dataset-name').addEventListener('input',validateImportDraft);
 $('#dataset-form').addEventListener('submit',async event=>{
   event.preventDefault();
-  if(!state.importDraft)return;
+  if(!state.importDraft||state.storage?.writable===false)return;
   const button=$('#dataset-import-button');
   button.disabled=true;button.textContent='Importing…';
   try{
     const records=DatasetImport.mapRecords(state.importDraft.records,importMapping());
+    const body=JSON.stringify({name:$('#dataset-name').value.trim(),records});
+    if(!ImportLimits.isPayloadWithinLimit(body))throw new Error(`Mapped dataset request exceeds the ${IMPORT_LIMIT_MIB} MiB API limit.`);
     const result=await getJSON(`${API}/dataset/import`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:$('#dataset-name').value.trim(),records})
+      body
     });
     $('#dataset-import-status').textContent=`${result.dataset.records.toLocaleString()} records imported as “${result.dataset.name}”.`;
     $('#dataset-import-status').className='dataset-import-status success';

@@ -28,6 +28,12 @@ synthetic demo and its community reports. The active dashboard can be switched
 back to that demo without deleting the imported file. The fixed research
 benchmark and its saved results are not changed by imports.
 
+Uploads are limited to 4 MiB, including the serialized mapped JSON request.
+Local development stores imports as JSON. Vercel deployments without a
+configured durable storage provider are read-only: the synthetic dashboard and
+fixed research results remain available, but importing, switching datasets,
+and submitting community reports are disabled.
+
 The Research workspace can run the four scoring models, a fixed 12-unit
 allocation, and nearest-neighbour versus 2-opt route-distance comparisons for
 the active import. Multi-seed robustness is not estimated from a single
