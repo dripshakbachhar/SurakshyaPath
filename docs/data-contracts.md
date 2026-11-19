@@ -2,7 +2,9 @@
 
 ## Incident contract
 
-All dashboard incidents use the same normalized shape regardless of whether they came from the canonical synthetic dataset or a live report:
+Dashboard and imported records use a normalized shape while retaining source
+labels that distinguish canonical synthetic records, community reports, and
+user imports:
 
 ```json
 {
@@ -15,12 +17,21 @@ All dashboard incidents use the same normalized shape regardless of whether they
   "note": "string",
   "lat": 27.7,
   "lng": 85.3,
-  "sourceType": "simulation | community-report",
-  "dataStatus": "SYNTHETIC | LIVE"
+  "sourceType": "simulation | community-report | user-import",
+  "dataStatus": "SYNTHETIC | LIVE | IMPORTED"
 }
 ```
 
-The dashboard never treats synthetic records as real-world police records.
+Canonical synthetic data is immutable through the web API. Community reports
+are persisted separately and may be combined with the synthetic seed for the
+local live dashboard. Imported datasets are separately identified and are not
+stored over the canonical benchmark.
+
+The active dataset summary includes an `id` and `provenance`; imported
+summaries also expose the saved `importedDatasetId`. Dataset-specific research
+responses include `sourceDataset.id` and the same id in their result dataset
+metadata. The fixed research-summary response identifies
+`canonical-synthetic-benchmark-v1`.
 
 ## Dashboard snapshot
 
@@ -34,6 +45,12 @@ The dashboard never treats synthetic records as real-world police records.
   "dataQuality": {}
 }
 ```
+
+The storage status returned by health/dashboard/diagnostics distinguishes
+`configured`, observed `readable` and `writable` outcomes, `available`, and a
+`durability` description. For local JSON storage, `writable` remains unknown
+until an actual successful write; the app does not probe by creating a file.
+Atomic rename is not a managed durability guarantee.
 
 ## Intelligence contract
 
