@@ -6,11 +6,11 @@ The dashboard and research experiments now share the same canonical synthetic da
 
 1. `data/synthetic_incidents.csv` provides 1,567 deterministic records with integer `age_days`.
 2. `data/live-incidents.js` assigns the nearest canonical zone and converts each age into a UTC calendar-date interval. The legacy `ts` field is a date anchor, not an observed event time; each record carries `time.precision: "date"` and `time.origin: "synthetic"`.
-3. `server.js` restores local incidents, imported data, and the active dataset through the storage interface. Missing incident data starts from the canonical synthetic dataset without a startup write; invalid stored state is reported and blocks further writes rather than being silently overwritten.
+3. `server.js` loads the canonical seed independently from local community reports, imported data, and the active dataset pointer. Missing community-report data starts empty without a startup write; invalid stored state is reported and blocks further writes rather than being silently overwritten.
 4. An anonymous report enters through `POST /api/incidents`.
 5. Boundary validation checks location, type, approximate time-window and payload limits.
 6. The report is assigned to the nearest canonical zone and receives a bounded approximate time interval plus a separate submission timestamp.
-7. Local reports are written through the atomic JSON adapter before becoming part of the in-memory snapshot. When persistent storage is unavailable, the endpoint returns `503` without changing the snapshot.
+7. In local research mode, reports are written to `community-reports.json` through the atomic JSON adapter before being combined with the synthetic demo snapshot. They never overwrite the canonical seed. Public read-only mode rejects the request before changing data.
 8. The next dashboard snapshot recomputes risk, analytics, data quality and intelligence from the same incident snapshot.
 9. The intelligence layer consumes both validated observations and the resulting risk-zone model.
 10. The browser replaces its application state with that snapshot; map, charts, statistics, patrol and intelligence views derive from it.
@@ -21,9 +21,9 @@ A successfully persisted incident must appear in the next `/api/dashboard` respo
 
 ## Deployment note
 
-Local hosting has writable JSON persistence. Vercel uses a read-only adapter when no durable provider is configured: the canonical synthetic dataset and fixed research results remain available, while community reports, dataset imports, and dataset switching return an explicit `503`. No writes are made to project files or `/tmp`. A durable external store is required before enabling persistent production writes.
+Ordinary non-production local hosting defaults to local research mode; local JSON persistence is best-effort filesystem storage and is shared by the process. `SURAKSHYA_MODE=public-read-only`, production mode, and recognized deployment environments use a read-only adapter on any provider. The canonical synthetic dataset and fixed research results remain available, while community reports, dataset imports, and dataset switching return an explicit `503`. A durable external store and authorization design are required before public writes can be enabled.
 
-Dataset uploads are limited to 4 MiB both at the browser and Express request-body boundaries. The limit is below [Vercel's 4.5 MB function request-body ceiling](https://vercel.com/docs/functions/limitations#request-body-size); the browser additionally checks the serialized, mapped JSON payload because it can be larger than its source file.
+Dataset source files and mapped JSON requests are limited to 4 MiB in the browser, and JSON request bodies are limited to 4 MiB by Express. The browser checks the serialized, mapped request because it can be larger than its source file. The browser parses the file; the mapped records are transmitted to this application server when import is submitted.
 
 ## Temporal contract
 
