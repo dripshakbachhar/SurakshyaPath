@@ -4,6 +4,7 @@
 
 const express = require('express');
 const path = require('path');
+const { createHash } = require('crypto');
 const { ZONES } = require('./config/zones');
 const { INCIDENT_TYPES: DEMO_TYPES } = require('./config/incident-types');
 const { computeZones: computeZonesFromModel } = require('./algorithms/risk');
@@ -15,7 +16,7 @@ const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligen
 const Temporal = require('./public/js/temporal');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
 const { prepareImportedDataset } = require('./data/imported-dataset');
-const { createStorage, PersistentStorageError } = require('./storage/json-storage');
+const { createStorage, PersistentStorageError, resolveOperatingMode } = require('./storage/json-storage');
 const ImportLimits = require('./public/js/import-limits');
 const RESEARCH_SUMMARY = require('./experiments/results/summary/research-summary.json');
 
@@ -50,6 +51,8 @@ const sampleNotes = {
   infrastructure: ['Broken streetlight reported.', 'Damaged public infrastructure reported.', 'Poor lighting reported.']
 };
 
+const operatingMode = resolveOperatingMode();
+const mutationsAllowed = operatingMode.mode === 'local-research';
 
 function seedIncidents(now = Date.now()) {
   return loadSyntheticIncidents(now);
@@ -57,54 +60,86 @@ function seedIncidents(now = Date.now()) {
 
 const storage = createStorage();
 let storageFailure = null;
+let storageReadStatus = null;
+let storageWriteStatus = null;
 function storageStatus() {
   const status = storage.status();
-  return storageFailure
-    ? { ...status, available: false, writable: false, reason: storageFailure.message }
-    : status;
+  return {
+    ...status,
+    operatingMode: operatingMode.mode,
+    readable: storageFailure?.operation === 'read' ? false : storageReadStatus === null ? status.readable : storageReadStatus,
+    writable: storageFailure ? false : storageWriteStatus === null ? status.writable : storageWriteStatus,
+    available: storageFailure ? false :
+      (storageReadStatus === true || storageWriteStatus === true ? true : status.available),
+    reason: storageFailure?.message || status.reason
+  };
 }
-function recordStorageFailure(error) {
+function recordStorageFailure(error, operation = 'write') {
   storageFailure = {
     message: error?.message || 'A persistent storage operation failed.',
-    code: error?.code || 'STORAGE_ERROR'
+    code: error?.code || 'STORAGE_ERROR',
+    operation
   };
   console.error('Persistent storage is unavailable:', error);
 }
 function readStoredValue(key, isValid, label) {
-  if (!storage.status().available) return null;
+  if (!storage.status().configured) return null;
   try {
     const value = storage.read(key);
+    if (value !== null) storageReadStatus = true;
     if (value !== null && !isValid(value)) {
       throw new PersistentStorageError(`Stored ${label} has an invalid shape.`, 'STORAGE_INVALID_DATA');
     }
     return value;
   } catch (error) {
-    recordStorageFailure(error);
+    recordStorageFailure(error, 'read');
     return null;
   }
 }
 function isValidImportedDataset(value) {
-  return Boolean(value && typeof value === 'object' &&
-    typeof value.name === 'string' &&
-    Array.isArray(value.records) && value.records.length > 0 && value.records.length <= MAX_INCIDENTS &&
-    Array.isArray(value.zones) && value.zones.length > 0 &&
-    value.zones.every(zone => Number.isFinite(zone.lat) && Number.isFinite(zone.lng)) &&
-    value.types && typeof value.types === 'object' && !Array.isArray(value.types));
-}
-let incidents = readStoredValue('incidents', value => Array.isArray(value) && value.length <= MAX_INCIDENTS, 'incident data');
-const isLegacyRuntimeSeed = Array.isArray(incidents) && incidents.length === 180 && incidents.every(incident => String(incident.id || '').startsWith('seed-'));
-if (!incidents || isLegacyRuntimeSeed) {
-  try {
-    incidents = seedIncidents();
-  } catch (error) {
-    console.error('Failed to load canonical synthetic data:', error);
-    incidents = [];
+  if (!value || typeof value !== 'object' ||
+      typeof value.name !== 'string' || !value.name.trim() || value.name.length > 80 ||
+      /[\u0000-\u001f\u007f]/.test(value.name) ||
+      (value.id !== undefined && (typeof value.id !== 'string' || !value.id.trim())) ||
+      !Array.isArray(value.records) || value.records.length === 0 || value.records.length > MAX_INCIDENTS ||
+      !Array.isArray(value.zones) || value.zones.length === 0 ||
+      !value.types || typeof value.types !== 'object' || Array.isArray(value.types)) return false;
+  const zoneIds = new Set();
+  for (const zone of value.zones) {
+    if (!zone || typeof zone.id !== 'string' || !zone.id ||
+        typeof zone.name !== 'string' || !Number.isFinite(zone.lat) || zone.lat < -90 || zone.lat > 90 ||
+        !Number.isFinite(zone.lng) || zone.lng < -180 || zone.lng > 180) return false;
+    zoneIds.add(zone.id);
   }
+  const typeIds = new Set(Object.keys(value.types));
+  if (!typeIds.size || Object.values(value.types).some(type =>
+    !type || typeof type.label !== 'string' || !Number.isFinite(type.severity))) return false;
+  return value.records.every(record => record && typeof record === 'object' && !Array.isArray(record) &&
+    typeof record.id === 'string' && zoneIds.has(record.zone) && typeIds.has(record.type) &&
+    Number.isFinite(record.lat) && record.lat >= -90 && record.lat <= 90 &&
+    Number.isFinite(record.lng) && record.lng >= -180 && record.lng <= 180 &&
+    Number.isFinite(record.ts) && record.ts >= 0 &&
+    Number.isFinite(record.severity) && record.severity >= 0 && record.severity <= 10);
 }
-let replaceLegacySeedOnWrite = isLegacyRuntimeSeed;
+function validCommunityReports(value) {
+  return Array.isArray(value) && value.length <= MAX_INCIDENTS &&
+    value.every(record => record && typeof record === 'object' && record.sourceType === 'community-report');
+}
+const canonicalIncidents = seedIncidents();
+const legacyIncidents = readStoredValue(
+  'incidents',
+  value => Array.isArray(value) && value.length <= MAX_INCIDENTS,
+  'legacy incident data'
+);
+const storedCommunityReports = readStoredValue('communityReports', validCommunityReports, 'community report data');
+const legacyCommunityReports = Array.isArray(legacyIncidents)
+  ? legacyIncidents.filter(record => record && record.sourceType === 'community-report')
+  : [];
+let communityReports = storedCommunityReports || legacyCommunityReports;
+let demoIncidents = canonicalIncidents.concat(communityReports);
+let incidents = demoIncidents;
 let riskCache = null;
 const RISK_CACHE_MS = 60000;
-let demoIncidents = incidents;
 let importedDataset = null;
 let activeMode = 'demo';
 let savedMode = { mode: 'demo' };
@@ -113,6 +148,20 @@ const storedMode = readStoredValue('activeMode',
   'active dataset mode');
 if (storedMode) savedMode = storedMode;
 importedDataset = readStoredValue('importedDataset', isValidImportedDataset, 'imported dataset');
+if (importedDataset) {
+  const digest = importedDataset.id
+    ? null
+    : createHash('sha256').update(JSON.stringify(importedDataset)).digest('hex').slice(0, 20);
+  importedDataset = {
+    ...importedDataset,
+    id: importedDataset.id || `import-legacy-${digest}`,
+    provenance: importedDataset.provenance || {
+      type: 'user-import',
+      importedAt: importedDataset.importedAt || null,
+      recordCount: importedDataset.records.length
+    }
+  };
+}
 if (savedMode.mode === 'imported' && !importedDataset) {
   recordStorageFailure(new PersistentStorageError('The active imported dataset is missing or invalid.', 'STORAGE_INVALID_DATA'));
   savedMode = { mode: 'demo' };
@@ -131,9 +180,9 @@ if (activeMode === 'imported') {
 
 function requireWritableStorage(res) {
   const status = storageStatus();
-  if (!status.writable) {
+  if (!mutationsAllowed || !status.configured || storageFailure) {
     res.status(503).json({
-      error: status.reason || 'Persistent writes are unavailable.',
+      error: status.reason || operatingMode.reason || 'Persistent writes are unavailable.',
       storage: status
     });
     return false;
@@ -144,22 +193,33 @@ function storageWriteFailure(res, error, message) {
   recordStorageFailure(error);
   return res.status(503).json({ error: message, storage: storageStatus() });
 }
+function storageWriteSucceeded() {
+  storageWriteStatus = true;
+}
 function datasetSummary() {
   return {
     mode: activeMode,
+    id: activeMode === 'imported' ? importedDataset.id : 'synthetic-dashboard-v1',
     name: activeMode === 'imported' ? importedDataset.name : 'Synthetic dashboard demo',
     records: incidents.length,
     zones: activeZones.length,
     categories: Object.values(activeTypes).map(type => type.label),
     importedAt: activeMode === 'imported' ? importedDataset.importedAt : null,
-    hasImportedDataset: Boolean(importedDataset)
+    provenance: activeMode === 'imported' ? importedDataset.provenance : { type: 'synthetic-demo' },
+    communityReports: activeMode === 'demo' ? communityReports.length : 0,
+    hasImportedDataset: Boolean(importedDataset),
+    importedDatasetId: importedDataset?.id || null
   };
 }
-function activateImportedDataset() {
+function activateImportedDataset(dataset) {
+  if (!isValidImportedDataset(dataset)) {
+    throw new PersistentStorageError('The saved imported dataset is invalid.', 'STORAGE_INVALID_DATA');
+  }
+  importedDataset = dataset;
   activeMode = 'imported';
-  activeZones = importedDataset.zones;
-  activeTypes = importedDataset.types;
-  incidents = importedDataset.records;
+  activeZones = dataset.zones;
+  activeTypes = dataset.types;
+  incidents = dataset.records;
   const lat = activeZones.reduce((sum, zone) => sum + zone.lat, 0) / activeZones.length;
   const lng = activeZones.reduce((sum, zone) => sum + zone.lng, 0) / activeZones.length;
   activeStations = [{ id: 'dataset-centre', name: 'Dataset centre', lat, lng }];
@@ -220,36 +280,48 @@ app.get('/api/health', (req, res) => res.json({
   service: 'SurakshyaPath',
   version: '1.1.0',
   timestamp: new Date().toISOString(),
+  operatingMode: operatingMode.mode,
+  mutationPolicy: mutationsAllowed ? 'local-research-only' : 'disabled',
   storage: storageStatus()
 }));
 app.get('/api/config', (req, res) => res.json({ zones: activeZones, stations: activeStations, types: activeTypes }));
-app.get('/api/research/summary', (req, res) => res.json(RESEARCH_SUMMARY));
+app.get('/api/research/summary', (req, res) => res.json({
+  ...RESEARCH_SUMMARY,
+  sourceDataset: { id: 'canonical-synthetic-benchmark-v1', name: RESEARCH_SUMMARY.dataset }
+}));
 app.get('/api/incidents', (req, res) => res.json(incidents));
 app.get('/api/dataset', (req, res) => res.json(datasetSummary()));
 app.get('/api/dataset/research', (req, res) => {
   if (activeMode !== 'imported') {
     return res.status(409).json({ error: 'Import a dataset before running a dataset-specific research comparison.' });
   }
-  res.json(buildDatasetResearch(importedDataset, snapshotNow()));
+  res.json({
+    ...buildDatasetResearch(importedDataset, snapshotNow()),
+    sourceDataset: { id: importedDataset.id, name: importedDataset.name }
+  });
 });
 
 app.post('/api/dataset/import', (req, res) => {
   if (!requireWritableStorage(res)) return;
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Import request must be a JSON object.' });
+  }
   let dataset;
   try {
-    dataset = prepareImportedDataset(req.body || {});
+    dataset = prepareImportedDataset(req.body);
   } catch (error) {
     return res.status(400).json({ error: error.message });
   }
   try {
     storage.write('importedDataset', dataset);
+    storageWriteSucceeded();
   } catch (error) {
     return storageWriteFailure(res, error, 'Imported dataset could not be saved.');
   }
-  importedDataset = dataset;
   if (activeMode !== 'imported') {
     try {
       storage.write('activeMode', { mode: 'imported' });
+      storageWriteSucceeded();
     } catch (error) {
       return storageWriteFailure(
         res,
@@ -258,19 +330,29 @@ app.post('/api/dataset/import', (req, res) => {
       );
     }
   }
-  activateImportedDataset();
+  activateImportedDataset(dataset);
   res.status(201).json({ dataset: datasetSummary() });
 });
 
 app.post('/api/dataset/use-imported', (req, res) => {
   if (!requireWritableStorage(res)) return;
   if (!importedDataset) return res.status(404).json({ error: 'No saved imported dataset is available.' });
+  if (req.body !== undefined && (!req.body || typeof req.body !== 'object' || Array.isArray(req.body))) {
+    return res.status(400).json({ error: 'Activation request must be a JSON object.' });
+  }
+  if (req.body?.datasetId !== undefined && req.body.datasetId !== importedDataset.id) {
+    return res.status(409).json({ error: 'The requested dataset is not the saved imported dataset.' });
+  }
+  if (!isValidImportedDataset(importedDataset)) {
+    return res.status(409).json({ error: 'The saved imported dataset is invalid; the active dataset was not changed.' });
+  }
   try {
     storage.write('activeMode', { mode: 'imported' });
+    storageWriteSucceeded();
   } catch (error) {
     return storageWriteFailure(res, error, 'Dashboard could not switch to the saved imported dataset.');
   }
-  activateImportedDataset();
+  activateImportedDataset(importedDataset);
   res.json({ dataset: datasetSummary() });
 });
 
@@ -278,6 +360,7 @@ app.post('/api/dataset/use-demo', (req, res) => {
   if (!requireWritableStorage(res)) return;
   try {
     storage.write('activeMode', { mode: 'demo' });
+    storageWriteSucceeded();
   } catch (error) {
     return storageWriteFailure(res, error, 'Dashboard could not switch back to demo data.');
   }
@@ -302,7 +385,8 @@ app.post('/api/incidents', (req, res) => {
   if (!validCoordinate(lat, 27.55, 27.85) ||
       !validCoordinate(lng, 85.15, 85.55) ||
       !DEMO_TYPES[type] ||
-      (when !== undefined && !VALID_REPORT_WINDOWS.has(when))) {
+      (when !== undefined && !VALID_REPORT_WINDOWS.has(when)) ||
+      (note !== undefined && (typeof note !== 'string' || note.length > MAX_REPORT_NOTE_LENGTH))) {
     return res.status(400).json({ error: 'Invalid location, incident type, or time window.' });
   }
   if (!allowReport(req.ip)) return res.status(429).json({ error: 'Too many reports. Please try again later.' });
@@ -316,29 +400,30 @@ app.post('/api/incidents', (req, res) => {
     sourceType: 'community-report', dataStatus: 'LIVE',
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
   };
-  let updatedIncidents;
+  let updatedReports;
   try {
-    updatedIncidents = storage.update('incidents', current => {
-      const currentIncidents = replaceLegacySeedOnWrite || current === null ? demoIncidents : current;
-      if (!Array.isArray(currentIncidents) || currentIncidents.length > MAX_INCIDENTS) {
-        throw new PersistentStorageError('Stored incident data has an invalid shape.', 'STORAGE_INVALID_DATA');
+    updatedReports = storage.update('communityReports', current => {
+      const currentReports = current === null ? communityReports : current;
+      if (!validCommunityReports(currentReports)) {
+        throw new PersistentStorageError('Stored community report data has an invalid shape.', 'STORAGE_INVALID_DATA');
       }
-      if (currentIncidents.length >= MAX_INCIDENTS) {
+      if (canonicalIncidents.length + currentReports.length >= MAX_INCIDENTS) {
         const error = new Error('Incident storage limit reached.');
         error.code = 'INCIDENT_LIMIT';
         throw error;
       }
-      return currentIncidents.concat(incident);
-    }, demoIncidents);
+      return currentReports.concat(incident);
+    }, communityReports);
   } catch (error) {
     if (error.code === 'INCIDENT_LIMIT') {
       return res.status(503).json({ error: error.message });
     }
     return storageWriteFailure(res, error, 'Incident could not be persisted. Please try again.');
   }
-  incidents = updatedIncidents;
-  demoIncidents = updatedIncidents;
-  replaceLegacySeedOnWrite = false;
+  storageWriteSucceeded();
+  communityReports = updatedReports;
+  demoIncidents = canonicalIncidents.concat(communityReports);
+  incidents = demoIncidents;
   riskCache = null;
   res.status(201).json(incident);
 });
@@ -367,7 +452,7 @@ app.get('/api/diagnostics', (req, res) => {
   res.json({
     status: intelligence.status,
     data: { records: incidents.length, validRecords: quality.recordsAccepted, qualityScore: quality.qualityScore },
-    pipeline: { storage: persistence.available, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
+    pipeline: { storage: persistence.available === true, risk: true, analytics: true, intelligence: intelligence.status === 'SUCCESS' || intelligence.status === 'PARTIAL_SUCCESS' },
     storage: persistence,
     model: { type: intelligence.modelType, version: intelligence.modelVersion },
     generatedAt: intelligence.generatedAt
@@ -401,7 +486,9 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) {
 }
 
 function startServer(port = PORT) {
-  const server = app.listen(port, () => console.log('SurakshyaPath running on port ' + port));
+  const host = process.env.HOST || (operatingMode.mode === 'local-research' ? '127.0.0.1' : undefined);
+  const onListening = () => console.log('SurakshyaPath running on port ' + port);
+  const server = host ? app.listen(port, host, onListening) : app.listen(port, onListening);
   const shutdown = signal => {
     console.log(signal + ' received; shutting down gracefully.');
     server.close(error => {
