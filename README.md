@@ -149,21 +149,40 @@ See:
 
 ## Importing your data
 
-Open **Datasets** in the dashboard and import a CSV or JSON file. Map columns for
-zone, category, latitude, longitude, and date/time; severity is optional and
-defaults to 1. Zone labels from the file are retained, and the dashboard derives
-a centroid for each zone from its coordinates. Coordinates must use decimal
-latitude/longitude, and imported dates cannot be in the future.
+Open **Datasets** in the dashboard and import a CSV file with a header row or a
+JSON record array (or an object with a `records` array). Map columns for zone,
+category, latitude, and longitude; date/time and source identifier are optional.
+Severity is optional and defaults to 1. Zone labels from the file are retained,
+and the dashboard derives a centroid for each zone from its coordinates.
+Coordinates must be decimal latitude/longitude, severity must be from 0 to 10,
+and invalid or future timestamps are rejected. Date-only values remain
+date-only, timezone-less date-times are interpreted as UTC, and closed
+`start/end` intervals remain approximate ranges. Blank or recognized unknown
+date values remain unknown; unknown times and approximate ranges are excluded
+from severity × recency analysis.
+
+Validation is all-or-nothing. Every record must pass, otherwise no records are
+imported; the interface reports accepted/rejected counts and generic reasons
+without echoing raw records. Blank CSV lines are counted and skipped. Imports
+are limited to 4 MiB for both source and mapped request, 50,000 records, 100
+zones, and 100 categories. Malformed CSV structure, duplicate/empty headers,
+inconsistent row widths, duplicate mapped identifiers, invalid coordinates,
+and invalid field values block the whole import.
 
 The browser parses the source file; submitting an import transmits its mapped
 records to the application server. In local research mode, data is stored as
 local JSON files until manually removed and can be switched between the active
-dashboard and synthetic demo. There is no automatic expiration or per-user
-access control. Do not upload personally identifiable or sensitive records to
-an unsecured deployment. The Research workspace can run the same four scoring
-approaches, 12-unit allocation, and nearest-neighbour versus 2-opt distance
-comparison on the active import. Imports do not modify the canonical research
-dataset or its saved experiment results.
+dashboard and synthetic demo. A successful new import replaces the single
+saved imported dataset; switching modes does not delete it. Its provenance
+includes the sanitized source filename and format, selected column mapping,
+validation and temporal-precision summaries, import time, schema version, and
+a SHA-256 hash of normalized records. There is no automatic expiration or
+per-user access control. Do not upload personally identifiable or sensitive
+records to an unsecured deployment. The Research workspace can run the same
+four scoring approaches, 12-unit allocation, and nearest-neighbour versus
+2-opt distance comparison on the active import. Responses identify the source
+dataset, coverage, exclusions, warnings, and model configuration. Imports do
+not modify the canonical research dataset or its saved experiment results.
 
 Ordinary non-production local development defaults to `local-research`.
 `SURAKSHYA_MODE=public-read-only` selects the public mode; production and

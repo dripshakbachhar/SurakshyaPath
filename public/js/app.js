@@ -45,7 +45,7 @@ function recentCountLabel(zone){
 }
 let lastSuccessfulRefresh=null,detailReturnFocus=null;
 function toast(message,ok=true){const t=$('#toast');if(!t)return;t.textContent=message;t.className='toast show '+(ok?'ok':'err');clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='toast',3200);}
-async function getJSON(url,options={}){const res=await fetch(url,{headers:{Accept:'application/json',...(options.headers||{})},...options});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||`Request failed (${res.status})`);return data;}
+async function getJSON(url,options={}){const res=await fetch(url,{headers:{Accept:'application/json',...(options.headers||{})},...options});const data=await res.json().catch(()=>({}));if(!res.ok){const error=new Error(data.error||`Request failed (${res.status})`);error.status=res.status;error.data=data;throw error;}return data;}
 function setMobileMapVisible(visible){
   const isMobile=window.matchMedia('(max-width: 760px)').matches;
   state.mobileMapVisible=isMobile&&visible;
@@ -153,6 +153,13 @@ function renderResearchSummary(summary){
   const status=$('#research-results-status');
   status.textContent=`Stored canonical results loaded · ${summary.sourceDataset?.id||'canonical-synthetic-benchmark-v1'} · seed 208304 · frequency-only reference · ${rankResults.length} models`;
   status.className='research-results-status';
+  const source=summary.sourceDataset||{};
+  const precision=Object.entries(source.temporalCoverage?.precisionCounts||{})
+    .map(([kind,count])=>`${count} ${kind}`).join(', ')||'precision unavailable';
+  const config=summary.modelConfiguration||{};
+  const modelNames=(config.scoringModels||rankResults.map(result=>result.model)).join(', ');
+  const warnings=(summary.warnings||[]).join(' ');
+  $('#research-source-summary').textContent=`Source ${source.id||'canonical-synthetic-benchmark-v1'} · ${Number(source.recordCount||1567).toLocaleString()} records · ${Number(source.zoneCount||10)} zones · ${precision}. Version/hash not recorded for this fixed result set. Models: ${modelNames}; reference ${config.referenceModel||summary.risk_reference_model||'frequency-only'}; allocation budget ${config.allocationBudget||summary.officer_budget||12}. ${source.temporalCoverage?.hourlyAnalysis?.explanation||''} ${warnings}`;
   $('#research-highlight').textContent=`In the canonical scenario, severity-only re-ranked ${severityRank?.zones_with_rank_change??0} of 10 zones and changed the 12-officer allocation in ${severityAllocation?.zones_with_changed_allocation??0} zones.`;
   $('#research-highlight').hidden=false;
 }
@@ -249,7 +256,16 @@ function updateDatasetUI(){
   $('#report-storage-note').hidden=!readOnly;
   $('#report-storage-note').textContent=readOnly?(storage.reason||'Community reporting is disabled because persistent storage is unavailable.'):'';
   $('.dashboard-action[data-go="report"]').classList.toggle('hidden',reportDisabled);
-  $('#dataset-current').innerHTML=`<span>Active dashboard dataset</span><b>${esc(dataset.name||'Synthetic dashboard demo')}</b><small>${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones · ${imported?'Imported data':'Synthetic demo'} · ${esc(dataset.id||'synthetic-dashboard-v1')}</small><small>Mode: ${esc(modeLabel)}</small>${readOnly?`<small>Read-only mode: ${esc(storage.reason||'persistent writes are disabled.')}</small>`:''}`;
+  const provenance=dataset.provenance||{};
+  const mapping=provenance.selectedColumnMapping
+    ? Object.entries(provenance.selectedColumnMapping).map(([field,column])=>`${field} ← ${column}`).join(', ')
+    : '';
+  const hash=dataset.contentHash?.value||provenance.contentHash?.value;
+  const validation=provenance.validationSummary;
+  const provenanceDetails=imported
+    ? `<small>Source file: ${esc(provenance.originalFileName||'not provided')}${provenance.originalFormat?` · ${esc(provenance.originalFormat.toUpperCase())}`:''}</small>${mapping?`<small>Column mapping: ${esc(mapping)}</small>`:''}<small>Schema v${esc(dataset.schemaVersion||provenance.schemaVersion||'unknown')} · ${validation?`${Number(validation.acceptedRecords||0)} accepted / ${Number(validation.rejectedRecords||0)} rejected (all-or-nothing)`:''}</small>${hash?`<small>SHA-256: ${esc(hash)}</small>`:''}<small>Research analysis: available for the active import</small>`
+    : `<small>Community reports are kept separate from the canonical benchmark (${Number(dataset.communityReports||0)} local reports in this demo view).</small>`;
+  $('#dataset-current').innerHTML=`<span>Active dashboard dataset</span><b>${esc(dataset.name||'Synthetic dashboard demo')}</b><small>${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones · ${imported?'Imported data':'Synthetic demo'} · ${esc(dataset.id||'synthetic-dashboard-v1')}</small><small>Mode: ${esc(modeLabel)}</small>${provenanceDetails}${readOnly?`<small>Read-only mode: ${esc(storage.reason||'persistent writes are disabled.')}</small>`:''}`;
   $('#use-demo-data').classList.toggle('hidden',!imported);
   $('#use-saved-import').classList.toggle('hidden',imported||!dataset.hasImportedDataset);
   $('#use-demo-data').disabled=readOnly;
@@ -279,12 +295,16 @@ function renderDatasetResearch(result){
   };
   $('#dataset-research-results').innerHTML=result.rows.map(row=>{const available=row.availability!=='UNAVAILABLE';const label=`${labels[row.model]||row.model}${row.availability==='PARTIAL'?' · partial':''}`;return `<tr><th scope="row">${esc(label)}</th><td>${available?esc(row.topZone):'Unavailable'}</td><td>${available?`${row.zonesReRanked} / ${row.zoneCount}`:'—'}</td><td>${available?`${row.allocationChanges} / ${row.zoneCount}`:'—'}</td><td>${available?`${Number(row.nearestNeighbourKm).toFixed(2)} km`:'—'}</td><td>${available?`${Number(row.twoOptKm).toFixed(2)} km`:'—'}</td></tr>`;}).join('');
   const coverage=result.dataset.temporalCoverage;
-  $('#dataset-research-summary').textContent=`Source ${result.dataset.id} · ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories. The severity × recency model used ${coverage.recencyEligibleRecords} records; ${coverage.recencyExcludedRecords} with unknown or future timing were excluded. These results do not replace or modify the canonical synthetic experiment.`;
+  const precision=coverage.precisionCounts||{};
+  const hash=result.dataset.contentHash?.value;
+  const temporalSummary=`Precision: ${precision.instant||0} exact, ${precision.date||0} date-only, ${precision.range||0} approximate range, ${precision.unknown||0} unknown. Recency used ${coverage.recencyEligibleRecords}; ${coverage.recencyExcludedRecords} were excluded.`;
+  const warnings=(result.warnings||[]).join(' ');
+  $('#dataset-research-summary').textContent=`Source ${result.dataset.id} · ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories · schema v${result.dataset.schemaVersion||'unknown'}${hash?` · SHA-256 ${hash}`:''}. ${temporalSummary} ${warnings} These results do not replace or modify the canonical synthetic experiment.`;
   $('#dataset-research-summary').hidden=false;
   $('#dataset-research-methods').textContent=`${result.methods.scoring} ${result.methods.allocation} ${result.methods.routing} ${result.methods.robustness}`;
   $('#dataset-research-methods').classList.remove('hidden');
   $('#dataset-research-table-wrap').classList.remove('hidden');
-  $('#dataset-research-status').textContent=`Dataset comparison complete · ${new Date(result.dataset.importedAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC`;
+  $('#dataset-research-status').textContent=`Dataset comparison complete · ${result.sourceDataset.id} · ${new Date(result.dataset.importedAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC`;
   $('#dataset-research-status').className='research-results-status';
   state.datasetResearch=result;
 }
@@ -309,11 +329,32 @@ const IMPORT_FIELDS=[
   {id:'map-category',key:'category',required:true,match:/category|incident.?type|^type$|event/i},
   {id:'map-latitude',key:'latitude',required:true,match:/latitude|^lat$/i},
   {id:'map-longitude',key:'longitude',required:true,match:/longitude|^lng$|^lon$/i},
-  {id:'map-date',key:'date',required:true,match:/timestamp|date|datetime|created.?at|occurred/i},
-  {id:'map-severity',key:'severity',required:false,match:/severity|weight|score/i}
+  {id:'map-date',key:'date',required:false,match:/timestamp|date|datetime|created.?at|occurred/i},
+  {id:'map-severity',key:'severity',required:false,match:/severity|weight|score/i},
+  {id:'map-identifier',key:'identifier',required:false,match:/^(id|record.?id|identifier|case.?number|record.?number)$/i}
 ];
 function importMapping(){
   return Object.fromEntries(IMPORT_FIELDS.map(field=>[field.key,$(`#${field.id}`).value]));
+}
+function importRequestPayload(records,mapping){
+  return {
+    name:$('#dataset-name').value.trim(),
+    sourceFileName:state.importDraft.fileName,
+    sourceFormat:state.importDraft.format,
+    mapping,
+    blankRowsSkipped:state.importDraft.blankRowsSkipped??null,
+    records
+  };
+}
+function setImportValidation(summary){
+  const precision=summary.precisionCounts||{};
+  const timeSummary=`Time precision: ${precision.instant||0} exact, ${precision.date||0} date-only, ${precision.range||0} approximate range, ${precision.unknown||0} unknown.`;
+  const temporalWarning=precision.unknown||precision.range
+    ? ' Unknown and approximate ranges are excluded from severity × recency analysis.'
+    : '';
+  const blankRows=state.importDraft?.blankRowsSkipped||0;
+  const blankSummary=blankRows?` ${blankRows} blank CSV lines were skipped (they were not data records).`:'';
+  $('#dataset-validation-summary').textContent=`${DatasetImport.formatValidationSummary(summary)} ${timeSummary}${temporalWarning}${blankSummary}`;
 }
 function validateImportDraft(){
   const status=$('#dataset-import-status'),button=$('#dataset-import-button');
@@ -325,15 +366,24 @@ function validateImportDraft(){
   }
   if(!state.importDraft){button.disabled=true;return;}
   try{
-    const records=DatasetImport.mapRecords(state.importDraft.records,importMapping());
+    const mapping=importMapping();
+    const validation=DatasetImport.validateRecords(state.importDraft.records,mapping);
+    state.importDraft.validation=validation.summary;
+    setImportValidation(validation.summary);
     const name=$('#dataset-name').value.trim();
     if(!name)throw new Error('Enter a dataset name.');
-    const body=JSON.stringify({name,records});
+    if(!validation.importable){
+      status.textContent='Validation failed. Nothing will be imported.';
+      status.className='dataset-import-status error';
+      button.disabled=true;
+      return;
+    }
+    const body=JSON.stringify(importRequestPayload(validation.records,mapping));
     const bodyBytes=ImportLimits.payloadByteLength(body);
     if(bodyBytes>ImportLimits.MAX_IMPORT_PAYLOAD_BYTES){
       throw new Error(`Mapped dataset request is ${(bodyBytes/(1024*1024)).toFixed(2)} MiB; the API limit is ${IMPORT_LIMIT_MIB} MiB.`);
     }
-    status.textContent=`Ready to import ${records.length.toLocaleString()} validated records.`;
+    status.textContent=`Ready to import all ${validation.summary.acceptedRecords.toLocaleString()} validated records from ${state.importDraft.fileName}.`;
     status.className='dataset-import-status success';
     button.disabled=false;
   }catch(error){
@@ -354,6 +404,8 @@ $('#dataset-file').addEventListener('change',async event=>{
   $('#dataset-mapping').classList.add('hidden');
   $('#dataset-import-button').disabled=true;
   $('#dataset-import-status').textContent='';
+  $('#dataset-validation-summary').textContent='';
+  $('#dataset-selected-file').textContent=file?`Selected file: ${file.name}`:'';
   if(!file)return;
   if(file.size>ImportLimits.MAX_IMPORT_PAYLOAD_BYTES){
     $('#dataset-import-status').textContent=`Files are limited to ${IMPORT_LIMIT_MIB} MiB. The mapped JSON request must also fit within the same API limit.`;
@@ -369,12 +421,18 @@ $('#dataset-file').addEventListener('change',async event=>{
   try{
     const content=await file.text();
     const parsed=format==='csv'?DatasetImport.parseCsv(content):DatasetImport.parseJson(content);
-    if(parsed.records.length>50000)throw new Error('Imports are limited to 50,000 records.');
-    state.importDraft={format,records:parsed.records};
+    state.importDraft={format,fileName:file.name,records:parsed.records,blankRowsSkipped:parsed.blankRowsSkipped||0};
     if(!$('#dataset-name').value.trim())$('#dataset-name').value=file.name.replace(/\.[^.]+$/,'').slice(0,80);
     for(const field of IMPORT_FIELDS){
       const select=$(`#${field.id}`);
-      const options=field.required?'<option value="">Select a column</option>':'<option value="">Not provided (default 1)</option>';
+      const emptyLabel=field.required
+        ?'Select a column'
+        :field.key==='severity'
+          ?'Not provided (default 1)'
+          :field.key==='date'
+            ?'Not provided (unknown time)'
+            :'Not provided';
+      const options=`<option value="">${emptyLabel}</option>`;
       select.innerHTML=options+parsed.headers.map(header=>`<option value="${esc(header)}">${esc(header)}</option>`).join('');
       const suggested=parsed.headers.find(header=>field.match.test(header));
       if(suggested)select.value=suggested;
@@ -383,7 +441,7 @@ $('#dataset-file').addEventListener('change',async event=>{
     $('#dataset-mapping').classList.remove('hidden');
     validateImportDraft();
   }catch(error){
-    $('#dataset-import-status').textContent=error.message||'Could not read the selected file.';
+    $('#dataset-import-status').textContent=`No records imported; 0 accepted. The file was rejected before record validation. ${error.message||'Could not read the selected file.'}`;
     $('#dataset-import-status').className='dataset-import-status error';
   }
 });
@@ -395,15 +453,20 @@ $('#dataset-form').addEventListener('submit',async event=>{
   const button=$('#dataset-import-button');
   button.disabled=true;button.textContent='Importing…';
   try{
-    const records=DatasetImport.mapRecords(state.importDraft.records,importMapping());
-    const body=JSON.stringify({name:$('#dataset-name').value.trim(),records});
+    const mapping=importMapping();
+    const validation=DatasetImport.validateRecords(state.importDraft.records,mapping);
+    state.importDraft.validation=validation.summary;
+    setImportValidation(validation.summary);
+    if(!validation.importable)throw new Error(DatasetImport.formatValidationSummary(validation.summary));
+    const body=JSON.stringify(importRequestPayload(validation.records,mapping));
     if(!ImportLimits.isPayloadWithinLimit(body))throw new Error(`Mapped dataset request exceeds the ${IMPORT_LIMIT_MIB} MiB API limit.`);
     const result=await getJSON(`${API}/dataset/import`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body
     });
-    $('#dataset-import-status').textContent=`${result.dataset.records.toLocaleString()} records imported as “${result.dataset.name}”.`;
+    const savedValidation=result.dataset.provenance.validationSummary;
+    $('#dataset-import-status').textContent=`${savedValidation.acceptedRecords.toLocaleString()} records imported as “${result.dataset.name}” (${result.dataset.id}).`;
     $('#dataset-import-status').className='dataset-import-status success';
     toast('Dataset imported and made active.');
     await refreshData();
@@ -415,6 +478,7 @@ $('#dataset-form').addEventListener('submit',async event=>{
   }catch(error){
     $('#dataset-import-status').textContent=error.message||'Dataset import failed.';
     $('#dataset-import-status').className='dataset-import-status error';
+    if(error.data?.validation)setImportValidation(error.data.validation);
     toast(error.message||'Dataset import failed.',false);
     button.disabled=false;
     button.textContent='Import and analyze';

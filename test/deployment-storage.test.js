@@ -59,6 +59,13 @@ test('read-only deployment serves research data and rejects persistent writes', 
 
   const researchResponse = await fetch(`${base}/research/summary`);
   assert.equal(researchResponse.status, 200);
+  const research = await researchResponse.json();
+  assert.equal(research.sourceDataset.id, 'canonical-synthetic-benchmark-v1');
+  assert.equal(research.sourceDataset.recordCount, 1567);
+  assert.equal(research.sourceDataset.zoneCount, 10);
+  assert.equal(research.sourceDataset.temporalCoverage.hourlyAnalysis.status, 'UNAVAILABLE');
+  assert.equal(research.modelConfiguration.referenceModel, 'frequency-only');
+  assert.ok(research.warnings.some(warning => /not validated real-world operational instructions/i.test(warning)));
 
   const writes = [
     ['/incidents', { lat: 27.7, lng: 85.3, type: 'theft' }],

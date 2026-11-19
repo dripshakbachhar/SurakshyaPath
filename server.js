@@ -114,12 +114,23 @@ function isValidImportedDataset(value) {
   const typeIds = new Set(Object.keys(value.types));
   if (!typeIds.size || Object.values(value.types).some(type =>
     !type || typeof type.label !== 'string' || !Number.isFinite(type.severity))) return false;
-  return value.records.every(record => record && typeof record === 'object' && !Array.isArray(record) &&
-    typeof record.id === 'string' && zoneIds.has(record.zone) && typeIds.has(record.type) &&
-    Number.isFinite(record.lat) && record.lat >= -90 && record.lat <= 90 &&
-    Number.isFinite(record.lng) && record.lng >= -180 && record.lng <= 180 &&
-    Number.isFinite(record.ts) && record.ts >= 0 &&
-    Number.isFinite(record.severity) && record.severity >= 0 && record.severity <= 10);
+  const recordIds = new Set();
+  const sourceIds = new Set();
+  return value.records.every(record => {
+    if (!record || typeof record !== 'object' || Array.isArray(record) ||
+        typeof record.id !== 'string' || recordIds.has(record.id) ||
+        zoneIds.has(record.zone) === false || !typeIds.has(record.type) ||
+        !Number.isFinite(record.lat) || record.lat < -90 || record.lat > 90 ||
+        !Number.isFinite(record.lng) || record.lng < -180 || record.lng > 180 ||
+        !(record.ts === null || (Number.isFinite(record.ts) && record.ts >= 0)) ||
+        !Number.isFinite(record.severity) || record.severity < 0 || record.severity > 10 ||
+        !Temporal.isValidTime(record.time) ||
+        (record.time.precision !== 'unknown' && record.time.start !== record.ts)) return false;
+    if (record.sourceId && sourceIds.has(record.sourceId)) return false;
+    recordIds.add(record.id);
+    if (record.sourceId) sourceIds.add(record.sourceId);
+    return true;
+  });
 }
 function validCommunityReports(value) {
   return Array.isArray(value) && value.length <= MAX_INCIDENTS &&
@@ -205,6 +216,8 @@ function datasetSummary() {
     zones: activeZones.length,
     categories: Object.values(activeTypes).map(type => type.label),
     importedAt: activeMode === 'imported' ? importedDataset.importedAt : null,
+    schemaVersion: activeMode === 'imported' ? importedDataset.schemaVersion || null : null,
+    contentHash: activeMode === 'imported' ? importedDataset.contentHash || null : null,
     provenance: activeMode === 'imported' ? importedDataset.provenance : { type: 'synthetic-demo' },
     communityReports: activeMode === 'demo' ? communityReports.length : 0,
     hasImportedDataset: Boolean(importedDataset),
@@ -285,20 +298,44 @@ app.get('/api/health', (req, res) => res.json({
   storage: storageStatus()
 }));
 app.get('/api/config', (req, res) => res.json({ zones: activeZones, stations: activeStations, types: activeTypes }));
-app.get('/api/research/summary', (req, res) => res.json({
-  ...RESEARCH_SUMMARY,
-  sourceDataset: { id: 'canonical-synthetic-benchmark-v1', name: RESEARCH_SUMMARY.dataset }
-}));
+app.get('/api/research/summary', (req, res) => {
+  const precisionCounts = Temporal.precisionCounts(canonicalIncidents, snapshotNow());
+  res.json({
+    ...RESEARCH_SUMMARY,
+    sourceDataset: {
+      id: 'canonical-synthetic-benchmark-v1',
+      name: RESEARCH_SUMMARY.dataset,
+      schemaVersion: null,
+      contentHash: null,
+      recordCount: canonicalIncidents.length,
+      zoneCount: ZONES.length,
+      temporalCoverage: {
+        precisionCounts,
+        hourlyAnalysis: {
+          status: 'UNAVAILABLE',
+          explanation: 'Synthetic age anchors are date-level simulation inputs, not observed event timestamps.'
+        }
+      }
+    },
+    modelConfiguration: {
+      scoringModels: RESEARCH_SUMMARY.risk.map(result => result.model),
+      referenceModel: RESEARCH_SUMMARY.risk_reference_model,
+      allocationBudget: RESEARCH_SUMMARY.officer_budget,
+      seed: 208304
+    },
+    warnings: [
+      'Synthetic age anchors do not establish exact event times; event-hour analysis is unavailable.',
+      'Spatial rankings, routes, and allocations are experimental outputs, not validated real-world operational instructions.'
+    ]
+  });
+});
 app.get('/api/incidents', (req, res) => res.json(incidents));
 app.get('/api/dataset', (req, res) => res.json(datasetSummary()));
 app.get('/api/dataset/research', (req, res) => {
   if (activeMode !== 'imported') {
     return res.status(409).json({ error: 'Import a dataset before running a dataset-specific research comparison.' });
   }
-  res.json({
-    ...buildDatasetResearch(importedDataset, snapshotNow()),
-    sourceDataset: { id: importedDataset.id, name: importedDataset.name }
-  });
+  res.json(buildDatasetResearch(importedDataset, snapshotNow()));
 });
 
 app.post('/api/dataset/import', (req, res) => {
@@ -310,7 +347,10 @@ app.post('/api/dataset/import', (req, res) => {
   try {
     dataset = prepareImportedDataset(req.body);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    return res.status(400).json({
+      error: error.message,
+      ...(error.validation ? { validation: error.validation } : {})
+    });
   }
   try {
     storage.write('importedDataset', dataset);

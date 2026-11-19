@@ -87,6 +87,10 @@ test('local API persists reports atomically and preserves separate datasets', as
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: 'Isolated test dataset',
+      sourceFileName: 'observations.csv',
+      sourceFormat: 'csv',
+      mapping: { zone: 'district', category: 'kind', latitude: 'lat', longitude: 'lng', date: 'occurred' },
+      blankRowsSkipped: 3,
       records: [{
         zone: 'Test Zone',
         category: 'Observation',
@@ -102,9 +106,40 @@ test('local API persists reports atomically and preserves separate datasets', as
   const importedDataset = (await importResponse.clone().json()).dataset;
   assert.match(importedDataset.id, /^import-/);
   assert.equal(importedDataset.provenance.type, 'user-import');
+  assert.equal(importedDataset.provenance.originalFileName, 'observations.csv');
+  assert.equal(importedDataset.provenance.originalFormat, 'csv');
+  assert.equal(importedDataset.provenance.blankRowsSkipped, 3);
+  assert.equal(importedDataset.provenance.selectedColumnMapping.zone, 'district');
+  assert.equal(importedDataset.provenance.validationSummary.acceptedRecords, 1);
+  assert.match(importedDataset.contentHash.value, /^[a-f0-9]{64}$/);
   assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'active-dataset.json'), 'utf8')).mode, 'imported');
   assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'imported-dataset.json'), 'utf8')).records.length, 1);
   assert.equal(JSON.parse(fs.readFileSync(storedPath, 'utf8')).length, 180);
+
+  const invalidRecordsResponse = await fetch(`${base}/dataset/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Must not replace saved data',
+      records: [{
+        zone: 'Sensitive raw zone label',
+        category: 'Observation',
+        lat: 91,
+        lng: 85.3,
+        ts: timestamp,
+        time: Temporal.exactTime(timestamp, 'imported'),
+        severity: 1
+      }]
+    })
+  });
+  const invalidRecords = await invalidRecordsResponse.json();
+  assert.equal(invalidRecordsResponse.status, 400);
+  assert.equal(invalidRecords.validation.acceptedRecords, 0);
+  assert.equal(invalidRecords.validation.rejectedRecords, 1);
+  assert.doesNotMatch(invalidRecords.error, /Sensitive raw zone label/);
+  const unchangedDataset = await (await fetch(`${base}/dataset`)).json();
+  assert.equal(unchangedDataset.id, importedDataset.id);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'imported-dataset.json'), 'utf8')).id, importedDataset.id);
 
   const invalidImportResponse = await fetch(`${base}/dataset/import`, {
     method: 'POST',
@@ -125,6 +160,22 @@ test('local API persists reports atomically and preserves separate datasets', as
     })
   });
   assert.equal(invalidNameResponse.status, 400);
+
+  const invalidFormatResponse = await fetch(`${base}/dataset/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Unsupported source format',
+      sourceFormat: 'xml',
+      records: [{
+        zone: 'Test Zone', category: 'Observation', lat: 27.7, lng: 85.3,
+        ts: timestamp, time: Temporal.exactTime(timestamp, 'imported'), severity: 1
+      }]
+    })
+  });
+  assert.equal(invalidFormatResponse.status, 400);
+  assert.match((await invalidFormatResponse.json()).error, /CSV or JSON/);
+  assert.equal((await (await fetch(`${base}/dataset`)).json()).id, importedDataset.id);
 
   const switchToDemo = await fetch(`${base}/dataset/use-demo`, { method: 'POST' });
   assert.equal(switchToDemo.status, 200);
@@ -156,15 +207,23 @@ test('local API persists reports atomically and preserves separate datasets', as
     body: JSON.stringify({ datasetId: importedDataset.id })
   });
   assert.equal(savedImportResponse.status, 200);
+  const reactivatedDataset = await savedImportResponse.json();
+  assert.equal(reactivatedDataset.dataset.provenance.originalFileName, 'observations.csv');
+  assert.equal(reactivatedDataset.dataset.provenance.blankRowsSkipped, 3);
   assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'active-dataset.json'), 'utf8')).mode, 'imported');
   const researchResponse = await fetch(`${base}/dataset/research`);
   const research = await researchResponse.json();
   assert.equal(researchResponse.status, 200);
   assert.equal(research.sourceDataset.id, importedDataset.id);
+  assert.equal(research.sourceDataset.contentHash.value, importedDataset.contentHash.value);
+  assert.equal(research.sourceDataset.schemaVersion, importedDataset.schemaVersion);
   assert.equal(research.dataset.id, importedDataset.id);
+  assert.equal(research.dataset.temporalCoverage.records, 1);
+  assert.equal(research.modelConfiguration.referenceModel, 'frequency-only');
 
   const switchResponse = await fetch(`${base}/dataset/use-demo`, { method: 'POST' });
   assert.equal(switchResponse.status, 200);
+  assert.equal((await fetch(`${base}/dataset/research`)).status, 409);
   assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'active-dataset.json'), 'utf8')).mode, 'demo');
   assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'imported-dataset.json'), 'utf8')).records.length, 1);
   assert.equal(JSON.parse(fs.readFileSync(path.join(storageRoot, 'community-reports.json'), 'utf8')).length, 1);

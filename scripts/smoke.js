@@ -2,6 +2,9 @@
 
 const { spawn } = require('node:child_process');
 const net = require('node:net');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 function findFreePort() {
   return new Promise((resolve, reject) => {
@@ -36,8 +39,14 @@ async function json(base, path, options) {
 
 (async () => {
   const port = await findFreePort();
+  const storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'surakshyapath-smoke-'));
   const child = spawn(process.execPath, ['server.js'], {
-    env: { ...process.env, PORT: String(port) },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      SURAKSHYA_MODE: 'local-research',
+      SURAKSHYA_DATA_DIR: storageRoot
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
@@ -72,8 +81,13 @@ async function json(base, path, options) {
 
     console.log('Smoke test passed: health → data → intelligence → create incident → dashboard propagation.');
   } finally {
-    child.kill('SIGTERM');
-    await new Promise(resolve => child.once('exit', resolve));
+    if (child.exitCode === null) {
+      await new Promise(resolve => {
+        child.once('exit', resolve);
+        child.kill('SIGTERM');
+      });
+    }
+    fs.rmSync(storageRoot, { recursive: true, force: true });
     if (child.exitCode && child.exitCode !== 0) console.error(stderr);
   }
 })().catch(error => {

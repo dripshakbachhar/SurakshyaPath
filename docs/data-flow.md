@@ -25,6 +25,15 @@ Ordinary non-production local hosting defaults to local research mode; local JSO
 
 Dataset source files and mapped JSON requests are limited to 4 MiB in the browser, and JSON request bodies are limited to 4 MiB by Express. The browser checks the serialized, mapped request because it can be larger than its source file. The browser parses the file; the mapped records are transmitted to this application server when import is submitted.
 
+## Import and research lifecycle
+
+1. The browser reads CSV/JSON locally, displays the selected file and a preview, and records the selected field mapping.
+2. Structural parsing and mapped-row validation report accepted/rejected counts and generic reasons. The policy is all-or-nothing; invalid rows or dataset limits stop the request. Blank CSV lines are explicitly counted and skipped.
+3. Time values are normalized through the shared UTC temporal utilities. Exact, date-only, range, and unknown values retain separate precision; no date-only or synthetic hour is inferred.
+4. The browser transmits mapped records plus source filename/format, mapping, and blank-line count to `POST /api/dataset/import`. The server validates and normalizes again, assigns an import ID, computes the normalized-content SHA-256, and preserves provenance.
+5. The server persists one imported dataset separately from the canonical benchmark and community reports, then persists the active-mode pointer. Only after successful activation does it update process-wide active dataset references and return success. If persistence fails, an explicit error is returned; a pointer-write failure can leave a newly saved import inactive and reports that state rather than claiming activation succeeded.
+6. Switching to the synthetic demo leaves the saved import and its provenance intact. The Research workspace analyzes only the active imported dataset; responses contain its identity, temporal coverage/exclusions, warnings, and model configuration. Invalid or unavailable imports produce an error rather than falling back to the canonical results.
+
 ## Temporal contract
 
 All event-time bounds, date buckets, and hourly metrics use UTC. Exact timestamps, date-only observations, approximate report windows, synthetic dates, and unknown legacy timestamps remain distinct in the `time` object. `ts` is retained for compatibility but is not authoritative when precision metadata is present. Hour-of-day metrics require exact, non-synthetic timestamps; counts that cannot be determined from the recorded interval are returned as unavailable and accompanied by exclusion counts.

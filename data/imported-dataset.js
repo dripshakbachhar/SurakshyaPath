@@ -1,10 +1,13 @@
 'use strict';
 
-const { randomUUID } = require('crypto');
-const MAX_RECORDS = 50000;
-const MAX_ZONES = 100;
-const MAX_CATEGORIES = 100;
+const { createHash, randomUUID } = require('crypto');
 const Temporal = require('../public/js/temporal');
+const DatasetImport = require('../public/js/dataset-import');
+const ImportLimits = require('../public/js/import-limits');
+
+const { MAX_RECORDS, MAX_ZONES, MAX_CATEGORIES } = DatasetImport;
+const IMPORT_SCHEMA_VERSION = 1;
+const MAPPING_KEYS = ['zone', 'category', 'latitude', 'longitude', 'date', 'severity', 'identifier'];
 
 function makeIds(labels, prefix) {
   const ids = new Map();
@@ -26,72 +29,88 @@ function makeIds(labels, prefix) {
   return ids;
 }
 
-function numberValue(value) {
-  if (value === null || value === undefined || (typeof value === 'string' && !value.trim())) return NaN;
-  return Number(value);
+function normalizeFileName(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || value.length > 255 || /[\u0000-\u001f\u007f]/.test(value)) {
+    throw new Error('Original filename must be 255 characters or fewer and contain no control characters.');
+  }
+  const fileName = value.split(/[\\/]/).pop().trim();
+  if (!fileName) throw new Error('Original filename is invalid.');
+  return fileName;
 }
 
-function prepareImportedDataset({ name, records }, now = Date.now()) {
-  if (!Array.isArray(records) || records.length === 0 || records.length > MAX_RECORDS) {
-    throw new Error(`Import must contain between 1 and ${MAX_RECORDS} records.`);
+function normalizeFormat(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !['csv', 'json'].includes(value.toLowerCase())) {
+    throw new Error('Original format must be CSV or JSON.');
   }
+  return value.toLowerCase();
+}
+
+function normalizeMapping(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Selected column mapping must be an object.');
+  }
+  const mapping = {};
+  for (const key of MAPPING_KEYS) {
+    if (value[key] === undefined || value[key] === null || value[key] === '') continue;
+    if (typeof value[key] !== 'string' || value[key].length > 256 ||
+        /[\u0000-\u001f\u007f]/.test(value[key])) {
+      throw new Error('Selected column mapping contains an invalid field name.');
+    }
+    mapping[key] = value[key];
+  }
+  return Object.keys(mapping).length ? mapping : null;
+}
+
+function normalizeBlankRows(value) {
+  if (value === undefined || value === null) return null;
+  if (!Number.isSafeInteger(value) || value < 0 || value > ImportLimits.MAX_IMPORT_PAYLOAD_BYTES) {
+    throw new Error('Blank-line count is invalid.');
+  }
+  return value;
+}
+
+function validationError(summary) {
+  const error = new Error(DatasetImport.formatValidationSummary(summary));
+  error.validation = summary;
+  return error;
+}
+
+function prepareImportedDataset(input, now = Date.now()) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Import request must be an object.');
+  }
+  const { name, records } = input;
   const datasetName = typeof name === 'string' ? name.trim() : '';
   if (!datasetName || datasetName.length > 80 || /[\u0000-\u001f\u007f]/.test(datasetName)) {
     throw new Error('Dataset name is required and must be 80 characters or fewer.');
   }
 
-  const zoneNames = [];
-  const categories = [];
-  const zoneKeySet = new Set();
-  const categoryKeySet = new Set();
-  const cleanRecords = records.map((record, index) => {
-    if (!record || typeof record !== 'object' || Array.isArray(record)) {
-      throw new Error(`Record ${index + 1} is not a valid object.`);
-    }
+  const sourceFileName = normalizeFileName(input.sourceFileName);
+  const sourceFormat = normalizeFormat(input.sourceFormat);
+  const selectedColumnMapping = normalizeMapping(input.mapping);
+  const blankRowsSkipped = normalizeBlankRows(input.blankRowsSkipped);
+  const validation = DatasetImport.validateRecords(records, {
+    zone: 'zone',
+    category: 'category',
+    latitude: 'lat',
+    longitude: 'lng',
+    severity: 'severity',
+    identifier: 'sourceId'
+  }, now);
+  if (!validation.importable) throw validationError(validation.summary);
 
-    const zoneName = typeof record.zone === 'string' ? record.zone.trim() : '';
-    const category = typeof record.category === 'string' ? record.category.trim() : '';
-    const lat = numberValue(record.lat);
-    const lng = numberValue(record.lng);
-    const ts = numberValue(record.ts);
-    const severity = numberValue(record.severity);
-
-    if (!zoneName || zoneName.length > 100) throw new Error(`Record ${index + 1} has a missing or invalid zone.`);
-    if (!category || category.length > 100) throw new Error(`Record ${index + 1} has a missing or invalid category.`);
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) throw new Error(`Record ${index + 1} has an invalid latitude.`);
-    if (!Number.isFinite(lng) || lng < -180 || lng > 180) throw new Error(`Record ${index + 1} has an invalid longitude.`);
-    if (!Number.isFinite(ts) || ts < 0 || ts > now) throw new Error(`Record ${index + 1} has an invalid or future date.`);
-    if (!Number.isFinite(severity) || severity < 0 || severity > 10) throw new Error(`Record ${index + 1} has an invalid severity (use a value from 0 to 10).`);
-    let time;
-    try {
-      time = Temporal.normalizeImportedTime(record.time, ts, now);
-    } catch (error) {
-      throw new Error(`Record ${index + 1} has invalid time precision metadata: ${error.message}`);
-    }
-
-    const zoneKey = zoneName.toLocaleLowerCase();
-    const categoryKey = category.toLocaleLowerCase();
-    if (!zoneKeySet.has(zoneKey)) { zoneKeySet.add(zoneKey); zoneNames.push(zoneName); }
-    if (!categoryKeySet.has(categoryKey)) { categoryKeySet.add(categoryKey); categories.push(category); }
-
-    return {
-      id: `import-${index + 1}`,
-      zoneName,
-      category,
-      lat,
-      lng,
-      ts,
-      time,
-      severity,
-      sourceType: 'user-import',
-      dataStatus: 'IMPORTED',
-      reporter: 'Imported dataset',
-      note: `Imported record (${category}).`
-    };
-  });
-
-  if (zoneNames.length > MAX_ZONES) throw new Error(`Import contains more than ${MAX_ZONES} zones.`);
-  if (categories.length > MAX_CATEGORIES) throw new Error(`Import contains more than ${MAX_CATEGORIES} categories.`);
+  const zoneNames = [...new Set(validation.records.map(record => record.zone.toLocaleLowerCase()))]
+    .map(key => validation.records.find(record => record.zone.toLocaleLowerCase() === key).zone);
+  const categories = [...new Set(validation.records.map(record => record.category.toLocaleLowerCase()))]
+    .map(key => validation.records.find(record => record.category.toLocaleLowerCase() === key).category);
+  const cleanRecords = validation.records.map((record, index) => ({
+    ...record,
+    zoneName: record.zone,
+    id: `import-${index + 1}`
+  }));
 
   const zoneIds = makeIds(zoneNames, 'zone');
   const categoryIds = makeIds(categories, 'category');
@@ -123,22 +142,66 @@ function prepareImportedDataset({ name, records }, now = Date.now()) {
     ts: record.ts,
     time: record.time,
     severity: record.severity,
-    sourceType: record.sourceType,
-    dataStatus: record.dataStatus,
-    reporter: record.reporter,
-    note: record.note
+    ...(record.sourceId ? { sourceId: record.sourceId } : {}),
+    sourceType: 'user-import',
+    dataStatus: 'IMPORTED',
+    reporter: 'Imported dataset',
+    note: `Imported record (${record.category}).`
   }));
 
   const importedAt = new Date(now).toISOString();
+  const contentHashInput = cleanRecords.map(record => ({
+    sourceId: record.sourceId || null,
+    zone: record.zoneName,
+    category: record.category,
+    lat: record.lat,
+    lng: record.lng,
+    ts: record.ts,
+    time: record.time,
+    severity: record.severity
+  }));
+  const contentHash = {
+    algorithm: 'sha256',
+    value: createHash('sha256').update(JSON.stringify(contentHashInput)).digest('hex')
+  };
+  const temporalPrecision = Temporal.precisionCounts(incidents, now);
+  const validationSummary = {
+    ...validation.summary,
+    acceptedRecords: incidents.length,
+    rejectedRecords: 0
+  };
+  const datasetId = `import-${randomUUID()}`;
   return {
-    id: `import-${randomUUID()}`,
+    id: datasetId,
     name: datasetName,
+    schemaVersion: IMPORT_SCHEMA_VERSION,
     importedAt,
-    provenance: { type: 'user-import', importedAt, recordCount: cleanRecords.length },
+    contentHash,
+    provenance: {
+      type: 'user-import',
+      datasetId,
+      datasetName,
+      originalFileName: sourceFileName,
+      originalFormat: sourceFormat,
+      blankRowsSkipped,
+      importedAt,
+      recordCount: incidents.length,
+      selectedColumnMapping,
+      validationSummary,
+      temporalPrecision,
+      schemaVersion: IMPORT_SCHEMA_VERSION,
+      contentHash
+    },
     records: incidents,
     zones,
     types
   };
 }
 
-module.exports = { prepareImportedDataset, MAX_RECORDS };
+module.exports = {
+  prepareImportedDataset,
+  MAX_RECORDS,
+  MAX_ZONES,
+  MAX_CATEGORIES,
+  IMPORT_SCHEMA_VERSION
+};

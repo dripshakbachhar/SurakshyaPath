@@ -108,13 +108,14 @@
         <p class="muted">CSV and JSON files are parsed in your browser. When you import, the mapped records—not the original file—are transmitted to this application server and saved as a separate imported dataset. They are not sent to an external analysis service.</p>
         <div id="dataset-current" class="active-dataset-card" role="status">Loading current dataset…</div>
         <div class="section-title">Import a dataset</div>
-        <p class="dataset-help">Each row must include a zone, category, valid latitude/longitude coordinates and date/time. ISO date-only values (YYYY-MM-DD) stay date-only; ISO date-times with an offset are exact. A date-time without an offset is interpreted as UTC. Severity is optional; when omitted, it defaults to 1. Files are limited to 4 MiB, and the mapped JSON request must also fit within 4 MiB. In local research mode, imports remain on the host's local JSON storage until the researcher removes them. There is no automatic expiration or per-user access control.</p>
+        <p class="dataset-help">Supported files are CSV with one header row or JSON containing a record array. Zone, category, latitude, and longitude are required; severity defaults to 1 and a record identifier is optional. Date/time may be omitted or unknown, but invalid and future values are rejected. ISO date-only values (YYYY-MM-DD) remain date-only; ISO date-times are exact (timezone-less date-times are interpreted as UTC); a closed start/end value is approximate. Unknown times and approximate ranges are excluded from severity × recency. Validation is all-or-nothing: every data row must pass, otherwise nothing is imported. Files and mapped JSON requests are each limited to 4 MiB; imports are limited to 50,000 rows, 100 zones, and 100 categories.</p>
         <p class="research-caveat">Do not upload personally identifiable or sensitive incident records to an unsecured or publicly accessible deployment. Public deployments are read-only by default; local research mode is intended for one researcher on a trusted machine.</p>
         <form id="dataset-form">
           <label for="dataset-name">Dataset name</label>
           <input id="dataset-name" type="text" maxlength="80" required placeholder="e.g. Community safety observations" />
           <label for="dataset-file">CSV or JSON file</label>
           <input id="dataset-file" type="file" accept=".csv,.json,text/csv,application/json" required />
+          <div id="dataset-selected-file" class="dataset-help" aria-live="polite"></div>
           <div id="dataset-mapping" class="dataset-mapping hidden">
             <div class="section-title">Map your columns</div>
             <p class="dataset-help">Select the source column for each field. Zone names from your file are kept as separate analysis zones.</p>
@@ -122,10 +123,12 @@
             <label for="map-category">Category <span>required</span></label><select id="map-category"></select>
             <label for="map-latitude">Latitude <span>required</span></label><select id="map-latitude"></select>
             <label for="map-longitude">Longitude <span>required</span></label><select id="map-longitude"></select>
-            <label for="map-date">Date / time <span>required</span></label><select id="map-date"></select>
+            <label for="map-date">Date / time <span>optional; blank means unknown</span></label><select id="map-date"></select>
             <label for="map-severity">Severity <span>optional; defaults to 1</span></label><select id="map-severity"></select>
+            <label for="map-identifier">Record identifier <span>optional; duplicates are rejected</span></label><select id="map-identifier"></select>
             <div id="dataset-preview" class="dataset-preview"></div>
           </div>
+          <div id="dataset-validation-summary" class="dataset-help" role="status" aria-live="polite"></div>
           <div id="dataset-import-status" class="dataset-import-status" role="status" aria-live="polite"></div>
           <button id="dataset-import-button" type="submit" class="btn primary" disabled>Import and analyze</button>
         </form>
@@ -178,6 +181,7 @@
         </ol>
         <div class="section-title">Canonical scenario · seed 208304</div>
         <div id="research-results-status" class="research-results-status" role="status"><span class="loading-spinner" aria-hidden="true"></span> Loading experiment results…</div>
+        <p id="research-source-summary" class="research-caveat" role="note"></p>
         <div id="research-highlight" class="research-highlight" role="status" hidden></div>
         <div class="research-table-wrap">
           <table class="research-table">
