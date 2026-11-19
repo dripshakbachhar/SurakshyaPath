@@ -8,7 +8,8 @@ const path = require('path');
 const {
   createStorage,
   LocalJsonStorage,
-  ReadOnlyStorage
+  ReadOnlyStorage,
+  resolveOperatingMode
 } = require('../storage/json-storage');
 const ImportLimits = require('../public/js/import-limits');
 
@@ -22,9 +23,12 @@ test('local JSON storage reads, writes, and updates isolated files', t => {
   const storage = temporaryStorage(t);
   assert.deepEqual(storage.status(), {
     mode: 'local-json',
-    available: true,
-    writable: true,
-    durable: true,
+    configured: true,
+    available: null,
+    readable: null,
+    writable: null,
+    durable: false,
+    durability: 'Best-effort local filesystem with atomic rename; not a managed database or guaranteed against machine/storage loss.',
     reason: null
   });
   assert.equal(storage.read('incidents'), null);
@@ -90,13 +94,25 @@ test('deployment without a durable provider selects an unavailable read-only ada
   assert.ok(storage instanceof ReadOnlyStorage);
   assert.deepEqual(storage.status(), {
     mode: 'read-only',
+    configured: false,
     available: false,
+    readable: false,
     writable: false,
     durable: false,
-    reason: 'Persistent storage is not configured for this Vercel deployment. Dashboard data is read-only.'
+    durability: 'No persistent storage provider is configured.',
+    reason: 'Deployment mode is read-only until durable storage and access control are implemented.'
   });
   assert.throws(() => storage.write('incidents', []), { code: 'STORAGE_UNAVAILABLE' });
   assert.throws(() => storage.update('incidents', value => value), { code: 'STORAGE_UNAVAILABLE' });
+});
+
+test('mode resolution keeps ordinary development local and fails closed for deployments and invalid settings', () => {
+  assert.deepEqual(resolveOperatingMode({}), { mode: 'local-research', reason: null });
+  assert.equal(resolveOperatingMode({ SURAKSHYA_MODE: 'public-read-only' }).mode, 'public-read-only');
+  assert.equal(resolveOperatingMode({ NODE_ENV: 'production' }).mode, 'public-read-only');
+  assert.equal(resolveOperatingMode({ VERCEL: '1', SURAKSHYA_MODE: 'local-research' }).mode, 'public-read-only');
+  assert.equal(resolveOperatingMode({ SURAKSHYA_MODE: 'typo' }).mode, 'unsupported');
+  assert.ok(createStorage({ env: { SURAKSHYA_MODE: 'typo' } }) instanceof ReadOnlyStorage);
 });
 
 test('import request sizing uses UTF-8 bytes and enforces the request boundary', () => {
