@@ -1,5 +1,6 @@
 'use strict';
 
+const { randomUUID } = require('crypto');
 const MAX_RECORDS = 50000;
 const MAX_ZONES = 100;
 const MAX_CATEGORIES = 100;
@@ -35,7 +36,7 @@ function prepareImportedDataset({ name, records }, now = Date.now()) {
     throw new Error(`Import must contain between 1 and ${MAX_RECORDS} records.`);
   }
   const datasetName = typeof name === 'string' ? name.trim() : '';
-  if (!datasetName || datasetName.length > 80) {
+  if (!datasetName || datasetName.length > 80 || /[\u0000-\u001f\u007f]/.test(datasetName)) {
     throw new Error('Dataset name is required and must be 80 characters or fewer.');
   }
 
@@ -128,9 +129,12 @@ function prepareImportedDataset({ name, records }, now = Date.now()) {
     note: record.note
   }));
 
+  const importedAt = new Date(now).toISOString();
   return {
+    id: `import-${randomUUID()}`,
     name: datasetName,
-    importedAt: new Date(now).toISOString(),
+    importedAt,
+    provenance: { type: 'user-import', importedAt, recordCount: cleanRecords.length },
     records: incidents,
     zones,
     types
