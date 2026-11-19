@@ -21,6 +21,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.1.0",
     "express": "^4.22.3"
   },
   "license": "MIT"
