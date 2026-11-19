@@ -3,3 +3,5 @@ node_modules/
 .DS_Store
 *.log
 data/incidents.json
+data/imported-dataset.json
+data/active-dataset.json

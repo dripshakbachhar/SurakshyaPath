@@ -15,7 +15,7 @@ The project intentionally makes modelling assumptions visible and compares multi
 ## System pipeline
 
 ```
-Synthetic incident data
+Synthetic or imported incident data
         ↓
 Validation + spatial assignment
         ↓
@@ -31,9 +31,11 @@ Dashboard + reproducible experiments
 ## Features
 
 - 🗺️ Leaflet-based incident and risk-map dashboard
+- 📂 Local CSV/JSON import with field mapping, validation, zone-aware analysis, and saved dataset switching
 - 📝 Anonymous local incident-reporting workflow
 - 📊 30-day risk scoring using severity × recency
 - 🧪 Frequency, severity, frequency×severity, and severity×recency research models
+- 🔬 On-demand four-model comparisons for imported datasets, with fixed-budget allocation and nearest-neighbour/2-opt route-distance comparisons
 - 🚔 Nearest-neighbour patrol routing with route-sensitivity experiments
 - 👮 Largest-remainder proportional allocation experiments
 - 📈 Timing, frequency, and trend analytics
@@ -144,6 +146,23 @@ See:
 - `research/LIMITATIONS.md`
 - `research/EXPERIMENT.md`
 - `research/RESULTS.md`
+
+## Importing your data
+
+Open **Datasets** in the dashboard and import a CSV or JSON file. Map columns for
+zone, category, latitude, longitude, and date/time; severity is optional and
+defaults to 1. Zone labels from the file are retained, and the dashboard derives
+a centroid for each zone from its coordinates. Coordinates must use decimal
+latitude/longitude, and imported dates cannot be in the future.
+
+Imports are stored locally in separate files under `data/` and can be switched
+between the active dashboard and the synthetic demo. The Research workspace can
+run the same four scoring approaches, 12-unit allocation, and nearest-neighbour
+versus 2-opt distance comparison on the active import. A single import does not
+provide a multi-seed robustness estimate. Imports do not modify the canonical
+research dataset or its saved experiment results. Only use data you are
+authorized to process; imported data provenance is not independently verified
+by this prototype.
 
 ## Responsible-use boundaries
 

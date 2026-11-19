@@ -2,9 +2,11 @@
 
 ## Official reference
 
-Nepal Police, Crime Investigation Department, Crime Monthly E-Bulletin, Year 9 Issue 4 (Shrawan 2083), reports **1,567 registered cases for Kathmandu Valley** for the month.
+The project cites Nepal Police, Crime Investigation Department, *Crime Monthly E-Bulletin*, Year 9 Issue 4 (Shrawan 2083), as reporting **1,567 registered cases for Kathmandu Valley** during that month. This is a project-cited aggregate; the bulletin issue itself was not located among the public pages checked for this update.
 
-The official figure is an aggregate count. It is not used as if it were a set of geocoded incident records.
+The [CID Crime Information Collection Unit page](https://cid.nepalpolice.gov.np/cid-wings/crime-information-collection-unit/) describes collecting and analyzing crime information and preparing monthly reports for internal reporting. It does not expose a downloadable, row-level incident dataset. The cited count is monthly context only: it does not provide incident-level coordinates, zones, or time-of-day needed by SurakshyaPath’s spatial models. Verify the original bulletin before using the figure in a publication.
+
+The [Nepal Police latest-news feed](https://nepalpolice.gov.np/ne/news/latest-news/) publishes narrative reports. These selected updates can help readers understand public context, but they are not a complete or consistently structured crime dataset. Arrests and allegations reported there are not findings of guilt, and the news feed is not used as model input.
 
 ## Spatial experiment layer
 

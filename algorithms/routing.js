@@ -42,6 +42,37 @@ function haversine(a, b) {
   );
 }
 
+function routeDistance(station, stops) {
+  let current = station;
+  let total = 0;
+  for (const stop of stops) {
+    total += haversine(current, stop);
+    current = stop;
+  }
+  return total;
+}
+
+function twoOptOpenRoute(station, stops) {
+  let best = [...stops];
+  let bestDistance = routeDistance(station, best);
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 0; i < best.length - 1; i++) {
+      for (let j = i + 1; j < best.length; j++) {
+        const candidate = [...best.slice(0, i), ...best.slice(i, j + 1).reverse(), ...best.slice(j + 1)];
+        const distance = routeDistance(station, candidate);
+        if (distance + 1e-9 < bestDistance) {
+          best = candidate;
+          bestDistance = distance;
+          improved = true;
+        }
+      }
+    }
+  }
+  return { stops: best, totalKm: bestDistance };
+}
+
 /**
  * Calculate a patrol route using the nearest-neighbour heuristic.
  *
@@ -123,5 +154,7 @@ function computePatrol({
 
 module.exports = {
   haversine,
+  routeDistance,
+  twoOptOpenRoute,
   computePatrol,
 };

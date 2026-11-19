@@ -55,10 +55,12 @@ function calculateZoneRisk(zoneIncidents, types, now = Date.now()) {
 
     if (!type || !Number.isFinite(timestamp) || timestamp > now) return sum;
 
-    return sum + (
-      type.severity *
-      decayOf(timestamp, now)
-    );
+    const severity = type.useRecordSeverity && Number.isFinite(Number(incident.severity))
+      ? Number(incident.severity)
+      : type.severity;
+    if (!Number.isFinite(severity) || severity < 0) return sum;
+
+    return sum + severity * decayOf(timestamp, now);
   }, 0);
 }
 

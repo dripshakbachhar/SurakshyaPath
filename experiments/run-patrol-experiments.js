@@ -1,6 +1,6 @@
 const fs=require("fs");
 const path=require("path");
-const {computePatrol,haversine}=require("../algorithms/routing");
+const {computePatrol,routeDistance,twoOptOpenRoute}=require("../algorithms/routing");
 
 const dataDir=path.join(__dirname,"..","data");
 const resultsDir=path.join(__dirname,"results","patrol");
@@ -26,25 +26,6 @@ function orderZones(scores){
   return Object.entries(scores).sort((a,b)=>b[1]-a[1])
     .map(([name])=>zones.find(z=>z.name===name)).filter(Boolean);
 }
-function routeDistance(stops){
-  let current=station,total=0;
-  for(const stop of stops){total+=haversine(current,stop);current=stop;}
-  return total;
-}
-function twoOptOpenRoute(stops){
-  let best=[...stops],bestDistance=routeDistance(best),improved=true;
-  while(improved){
-    improved=false;
-    for(let i=0;i<best.length-1;i++){
-      for(let j=i+1;j<best.length;j++){
-        const candidate=[...best.slice(0,i),...best.slice(i,j+1).reverse(),...best.slice(j+1)];
-        const distance=routeDistance(candidate);
-        if(distance+1e-9<bestDistance){best=candidate;bestDistance=distance;improved=true;}
-      }
-    }
-  }
-  return {stops:best,totalKm:bestDistance};
-}
 const round=value=>Number(value.toFixed(2));
 
 const incidents=parseCsv(fs.readFileSync(input,"utf8")).map(r=>({
@@ -62,11 +43,11 @@ for(const [model,scores] of Object.entries(models)){
   // then compares the routing algorithm's nearest-neighbour order with 2-opt.
   // This measures route optimization under each model, not model superiority.
   const nearestNeighbour=computePatrol({station,zones:modelZones,stopCount:STOP_COUNT});
-  const optimized=twoOptOpenRoute(nearestNeighbour.stops);
+  const optimized=twoOptOpenRoute(station,nearestNeighbour.stops);
 
   const baselineOrder=nearestNeighbour.stops.map(s=>s.name);
   const optimizedOrder=optimized.stops.map(s=>s.name);
-  const baselineKm=routeDistance(nearestNeighbour.stops);
+  const baselineKm=routeDistance(station,nearestNeighbour.stops);
   const optimizedKm=optimized.totalKm;
   const savingsKm=baselineKm-optimizedKm;
   const changedOrder=baselineOrder.some((n,i)=>n!==optimizedOrder[i]);

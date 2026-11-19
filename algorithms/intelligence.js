@@ -9,9 +9,9 @@
 
 const DAY_MS = 86400000;
 
-const VALID_TYPES = new Set(['theft', 'suspicious', 'harassment', 'infrastructure']);
+const DEFAULT_TYPES = new Set(['theft', 'suspicious', 'harassment', 'infrastructure']);
 
-function classifyRecord(incident, zonesById, now) {
+function classifyRecord(incident, zonesById, types, now) {
   const reasons = [];
   if (!incident || typeof incident !== 'object') reasons.push('record is not an object');
   const ts = Number(incident?.ts);
@@ -20,15 +20,18 @@ function classifyRecord(incident, zonesById, now) {
 
   if (!Number.isFinite(ts)) reasons.push('timestamp is invalid');
   if (Number.isFinite(ts) && ts > now) reasons.push('timestamp is in the future');
-  if (!VALID_TYPES.has(incident?.type)) reasons.push('incident type is unknown');
+  const knownType = types
+    ? Object.hasOwn(types, incident?.type)
+    : DEFAULT_TYPES.has(incident?.type);
+  if (!knownType) reasons.push('incident type is unknown');
   if (!zonesById.has(incident?.zone)) reasons.push('zone is unknown');
-  if (!Number.isFinite(lat) || lat < 27.55 || lat > 27.85) reasons.push('latitude is outside configured bounds');
-  if (!Number.isFinite(lng) || lng < 85.15 || lng > 85.55) reasons.push('longitude is outside configured bounds');
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90) reasons.push('latitude is outside valid bounds');
+  if (!Number.isFinite(lng) || lng < -180 || lng > 180) reasons.push('longitude is outside valid bounds');
 
   return { valid: reasons.length === 0, reasons };
 }
 
-function buildDataQuality(incidents, zones, now = Date.now()) {
+function buildDataQuality(incidents, zones, now = Date.now(), types) {
   const source = Array.isArray(incidents) ? incidents : [];
   const zonesById = new Map((zones || []).map(zone => [zone.id, zone]));
   const rejected = [];
@@ -44,12 +47,12 @@ function buildDataQuality(incidents, zones, now = Date.now()) {
     if (isDuplicate) duplicates++;
     if (id) seen.add(id);
 
-    const check = classifyRecord(incident, zonesById, now);
+    const check = classifyRecord(incident, zonesById, types, now);
     if (isDuplicate) { check.reasons.push('duplicate id'); check.valid = false; }
     if (!check.valid) {
       rejected.push({ index, id: id || null, reasons: check.reasons });
       if (check.reasons.includes('timestamp is in the future')) futureDates++;
-      invalidCoordinates += check.reasons.filter(reason => reason.includes('outside configured bounds')).length;
+      invalidCoordinates += check.reasons.filter(reason => reason.includes('outside valid bounds')).length;
       if (check.reasons.some(reason => reason.includes('invalid') || reason.includes('unknown') || reason.includes('missing'))) missingValues++;
     }
   });
@@ -83,10 +86,10 @@ function statusFor(count, qualityScore) {
 function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date.now() }) {
   const source = Array.isArray(incidents) ? incidents : [];
   const zoneList = Array.isArray(zones) ? zones : [];
-  const quality = buildDataQuality(source, zoneList, now);
+  const quality = buildDataQuality(source, zoneList, now, types);
   const rejectedIndexes = new Set(quality.rejectedIndexes || []);
   const zonesById = new Map(zoneList.map(z => [z.id, z]));
-  const valid = source.filter((incident, index) => !rejectedIndexes.has(index) && classifyRecord(incident, zonesById, now).valid);
+  const valid = source.filter((incident, index) => !rejectedIndexes.has(index) && classifyRecord(incident, zonesById, types, now).valid);
   const recent30 = valid.filter(i => now - Number(i.ts) < 30 * DAY_MS);
   const recent7 = valid.filter(i => now - Number(i.ts) < 7 * DAY_MS);
   const previous7 = valid.filter(i => {
@@ -200,7 +203,9 @@ function buildIntelligence({ incidents, zones, riskZones = [], types, now = Date
     },
     limitations: [
       'This is an explainable statistical/heuristic layer, not a trained neural network.',
-      'The dashboard dataset is synthetic and must not be interpreted as real incident-level police data.',
+      source.some(incident => incident.dataStatus === 'IMPORTED')
+        ? 'Imported records are user-provided; their provenance and quality have not been independently verified.'
+        : 'The dashboard dataset is synthetic and must not be interpreted as real incident-level police data.',
       'Confidence is an evidence-coverage heuristic, not a calibrated probability.'
     ]
   };

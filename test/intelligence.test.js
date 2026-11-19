@@ -36,7 +36,7 @@ test('intelligence consumes the same validated incident snapshot as risk analyti
 
 test('data quality rejects invalid coordinates and unknown types', () => {
   const result = buildDataQuality([
-    { id: 'bad', zone: 'thamel', type: 'unknown', ts: NOW, lat: 0, lng: 0 }
+    { id: 'bad', zone: 'thamel', type: 'unknown', ts: NOW, lat: 91, lng: -181 }
   ], ZONES, NOW);
   assert.equal(result.recordsReceived, 1);
   assert.equal(result.recordsAccepted, 0);

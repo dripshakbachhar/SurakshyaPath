@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workspace · SurakshyaPath</title>
+  <meta name="description" content="SurakshyaPath is an experimental dashboard for incident analysis, risk modelling, patrol routing and resource planning." />
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+  <link rel="stylesheet" href="css/workspace.css" />
+</head>
+<body>
+  <div id="custom-cursor" class="custom-cursor" aria-hidden="true">
+    <span class="cursor-ring"></span><span class="cursor-center"></span><span class="cursor-north"></span>
+  </div>
+  <header class="app-header">
+    <div class="brand">
+      <img class="brand-mark" src="images/surakshya-path-logo.png" alt="" />
+      <div>
+        <h1>SurakshyaPath <span>सुरक्षापथ</span></h1>
+        <p>DATA &amp; RESEARCH WORKSPACE</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <span id="connection" class="connection pending" role="status" aria-live="polite">Loading</span>
+      <span id="data-updated" class="data-updated" role="status" aria-live="polite">Syncing dashboard…</span>
+      <a class="home-link" href="/" aria-label="Return to SurakshyaPath home">Home</a>
+    </div>
+  </header>
+
+  <div class="nav-row">
+    <nav id="tabs" class="tabs" role="tablist" aria-label="Dashboard sections">
+      <button class="tab active" type="button" role="tab" id="tab-overview" aria-controls="panel-overview" aria-selected="true" tabindex="0" data-tab="overview">Dashboard</button>
+      <button class="tab" type="button" role="tab" id="tab-datasets" aria-controls="panel-datasets" aria-selected="false" tabindex="-1" data-tab="datasets">Datasets</button>
+      <button class="tab" type="button" role="tab" id="tab-report" aria-controls="panel-report" aria-selected="false" tabindex="-1" data-tab="report">Report</button>
+      <button class="tab" type="button" role="tab" id="tab-risk" aria-controls="panel-risk" aria-selected="false" tabindex="-1" data-tab="risk">Risk map</button>
+      <button class="tab" type="button" role="tab" id="tab-patrol" aria-controls="panel-patrol" aria-selected="false" tabindex="-1" data-tab="patrol">Patrol planner</button>
+      <button class="tab" type="button" role="tab" id="tab-analytics" aria-controls="panel-analytics" aria-selected="false" tabindex="-1" data-tab="analytics">Analytics</button>
+      <button class="tab" type="button" role="tab" id="tab-research" aria-controls="panel-research" aria-selected="false" tabindex="-1" data-tab="research">Research</button>
+    </nav>
+  </div>
+
+  <section class="stats-bar" aria-label="Live dashboard summary">
+    <button class="stat stat-click" data-stat="total"><span id="stat-total" class="num">—</span><span><b>Records</b><small>current dashboard</small></span></button>
+    <button class="stat stat-click" data-stat="zones"><span id="stat-zones" class="num">—</span><span><b>Active zones</b><small>with reports</small></span></button>
+    <button class="stat stat-click" data-stat="critical"><span id="stat-critical" class="num">—</span><span><b>High-risk zones</b><small>current risk model</small></span></button>
+    <button class="stat stat-click" data-stat="recent"><span id="stat-recent" class="num">—</span><span><b>Last 24 hours</b><small>recent reports</small></span></button>
+  </section>
+
+  <div class="view-toggle-row">
+    <button id="mobile-view-toggle" class="view-toggle" type="button" aria-controls="map-shell panel" aria-expanded="false">Show map</button>
+  </div>
+
+  <main class="workspace">
+    <section id="map-shell" class="map-shell">
+      <div id="map"></div>
+      <div class="map-hud">
+        <div>
+          <strong>Zone map</strong>
+          <span id="map-mode">Select a zone, marker or heat area for more context.</span>
+        </div>
+        <button id="map-reset" class="icon-btn" type="button">Reset view</button>
+      </div>
+      <div class="map-legend" aria-label="Map legend">
+        <div class="map-legend-title">Map key</div>
+        <span><i class="map-key zone-key"></i>Risk zone</span>
+        <span><i class="map-key incident-key"></i>Incident</span>
+        <span><i class="map-key heat-key"></i>Heat intensity</span>
+        <div class="map-legend-hint">Click a zone or incident for details.</div>
+      </div>
+      <div id="map-zone-info" class="map-zone-info">
+        <div class="map-zone-title">Top risk zones</div>
+        <div id="map-zone-list">Loading…</div>
+      </div>
+    </section>
+
+    <aside id="panel" class="side-panel">
+      <section id="panel-overview" class="panel active" role="tabpanel" aria-labelledby="tab-overview">
+        <div class="panel-heading">
+          <div><span class="eyebrow">SurakshyaPath</span><h2>Research testbed</h2></div>
+          <span id="overview-updated" class="overview-updated">Waiting for dashboard data</span>
+        </div>
+        <div class="active-dataset-card"><span>Current dashboard dataset</span><b id="overview-dataset-name">Loading…</b><small id="overview-dataset-detail"></small></div>
+        <p class="muted">A computational testbed for exploring how scoring approaches affect spatial priorities, resource allocations, and route construction. The study uses synthetic data across 10 zones.</p>
+        <div class="overview-topics" aria-label="Research areas">
+          <div><b>Scoring models</b><span>Compare four approaches to zone prioritization.</span></div>
+          <div><b>Resource allocation</b><span>Explore allocation decisions under fixed budgets.</span></div>
+          <div><b>Route construction</b><span>Compare nearest-neighbour and 2-opt methods.</span></div>
+          <div><b>Robustness</b><span>Examine results across multiple synthetic seeds.</span></div>
+        </div>
+        <p class="overview-caveat">This is an experimental platform. Its outputs are not real-world crime predictions or evidence of improved public-safety outcomes. Detailed methods and results are in <button type="button" class="inline-link" data-go="research">Research</button>.</p>
+        <div class="section-title">Live dashboard</div>
+        <p id="overview-dataset-description" class="muted">The map and activity below show the selected dashboard dataset. Choose a dataset in the Datasets workspace.</p>
+        <div class="dashboard-actions">
+          <button type="button" class="dashboard-action primary-action" data-go="report"><b>Report an incident</b><span>Add a location-based report</span></button>
+          <button type="button" class="dashboard-action" data-go="risk"><b>Explore risk map</b><span>View zones and reports on the map</span></button>
+          <button type="button" class="dashboard-action" data-go="patrol"><b>Plan a patrol</b><span>Generate a route and allocation</span></button>
+        </div>
+        <div class="section-title">Highest-scoring zones</div>
+        <div id="overview-zones" class="mini-zone-list"></div>
+        <p class="dashboard-note">This live view can include reports submitted through the app. Fixed synthetic experiment results are in <button type="button" class="inline-link" data-go="research">Research</button>.</p>
+      </section>
+
+      <section id="panel-datasets" class="panel" role="tabpanel" aria-labelledby="tab-datasets">
+        <div class="panel-heading"><div><span class="eyebrow">Local data workspace</span><h2>Datasets</h2></div></div>
+        <p class="muted">Import a CSV or JSON incident dataset for dashboard analysis. Files are processed and stored by this app; they are not sent to an external analysis service.</p>
+        <div id="dataset-current" class="active-dataset-card" role="status">Loading current dataset…</div>
+        <div class="section-title">Import a dataset</div>
+        <p class="dataset-help">Each row must include a zone, category, latitude, longitude and date/time. Severity is optional; when omitted, it defaults to 1. Coordinates must be valid latitude/longitude values.</p>
+        <form id="dataset-form">
+          <label for="dataset-name">Dataset name</label>
+          <input id="dataset-name" type="text" maxlength="80" required placeholder="e.g. Community safety observations" />
+          <label for="dataset-file">CSV or JSON file</label>
+          <input id="dataset-file" type="file" accept=".csv,.json,text/csv,application/json" required />
+          <div id="dataset-mapping" class="dataset-mapping hidden">
+            <div class="section-title">Map your columns</div>
+            <p class="dataset-help">Select the source column for each field. Zone names from your file are kept as separate analysis zones.</p>
+            <label for="map-zone">Zone <span>required</span></label><select id="map-zone"></select>
+            <label for="map-category">Category <span>required</span></label><select id="map-category"></select>
+            <label for="map-latitude">Latitude <span>required</span></label><select id="map-latitude"></select>
+            <label for="map-longitude">Longitude <span>required</span></label><select id="map-longitude"></select>
+            <label for="map-date">Date / time <span>required</span></label><select id="map-date"></select>
+            <label for="map-severity">Severity <span>optional; defaults to 1</span></label><select id="map-severity"></select>
+            <div id="dataset-preview" class="dataset-preview"></div>
+          </div>
+          <div id="dataset-import-status" class="dataset-import-status" role="status" aria-live="polite"></div>
+          <button id="dataset-import-button" type="submit" class="btn primary" disabled>Import and analyze</button>
+        </form>
+        <button id="use-demo-data" type="button" class="btn secondary hidden">Switch back to synthetic demo</button>
+        <button id="use-saved-import" type="button" class="btn secondary hidden">Use saved imported dataset</button>
+        <p class="research-caveat">Importing changes the live dashboard only. The canonical 1,567-record synthetic research experiment and its saved results remain unchanged. The demo community-report form is disabled while an imported dataset is active.</p>
+      </section>
+
+      <section id="panel-report" class="panel" role="tabpanel" aria-labelledby="tab-report">
+        <div class="panel-heading"><div><span class="eyebrow">Live dashboard tool</span><h2>Submit a report</h2></div></div>
+        <p class="research-caveat">Reports update the live dashboard snapshot only; they are not added to the fixed research experiment or its stored results.</p>
+        <p class="muted">Choose a point on the map, describe the incident, and submit it without an identity field.</p>
+        <div id="picked-spot" class="picked">📍 Click the map to choose a location.</div>
+        <form id="report-form">
+          <label for="f-type">What happened?</label>
+          <select id="f-type" required>
+            <option value="theft">Theft / Pickpocketing</option>
+            <option value="suspicious">Suspicious Activity</option>
+            <option value="harassment">Harassment</option>
+            <option value="infrastructure">Infrastructure Issue</option>
+          </select>
+          <label for="f-when">When?</label>
+          <select id="f-when">
+            <option value="now">Just now</option>
+            <option value="today">Earlier today</option>
+            <option value="week">Within the past week</option>
+          </select>
+          <label for="f-note">Details <span>(optional)</span></label>
+          <textarea id="f-note" maxlength="280" rows="4" placeholder="Short factual description…"></textarea>
+          <button type="submit" class="btn primary">Submit anonymous report</button>
+        </form>
+        <div class="privacy-card">🔒 <b>Privacy by design</b><span>No name, phone number or login is collected by this interface.</span></div>
+      </section>
+
+      <section id="panel-research" class="panel" role="tabpanel" aria-labelledby="tab-research">
+        <div class="panel-heading"><div><span class="eyebrow">Separate research workspace</span><h2>Study and model comparison</h2></div></div>
+        <p class="muted">A reproducible comparison of four explainable risk-scoring methods on the same deterministic synthetic dataset.</p>
+        <div class="research-parameters">
+          <span><b>1,567</b> synthetic records</span><span><b>10</b> zones</span><span><b>4</b> models</span><span><b>5</b> synthetic seeds</span>
+        </div>
+        <div class="section-title">Study questions</div>
+        <ol class="research-questions">
+          <li><b>Risk ranking</b><span>How do the models change zone scores and priorities?</span></li>
+          <li><b>Resource allocation</b><span>How does model choice change a fixed 12-officer budget?</span></li>
+          <li><b>Patrol routing</b><span>How does priority selection affect route order and distance?</span></li>
+          <li><b>Reproducibility and robustness</b><span>Are results repeatable across the documented synthetic scenarios?</span></li>
+        </ol>
+        <div class="section-title">Canonical scenario · seed 208304</div>
+        <div id="research-results-status" class="research-results-status" role="status"><span class="loading-spinner" aria-hidden="true"></span> Loading experiment results…</div>
+        <div id="research-highlight" class="research-highlight" role="status" hidden></div>
+        <div class="research-table-wrap">
+          <table class="research-table">
+            <thead><tr><th scope="col">Scoring model</th><th scope="col">Top zone</th><th scope="col">Zones re-ranked</th><th scope="col">Allocations changed</th><th scope="col">Route distance</th></tr></thead>
+            <tbody id="research-results"></tbody>
+          </table>
+        </div>
+        <p class="research-caveat">Compared with the frequency-only reference. Allocation uses 12 officers; route distance is an estimate based on coordinates, not roads. Synthetic results are descriptive and not operational recommendations.</p>
+        <div class="section-title">Research this imported dataset</div>
+        <p class="muted">Run the same four scoring approaches on the currently active import. These on-demand results are separate from the canonical synthetic experiment above.</p>
+        <button id="dataset-research-run" type="button" class="btn secondary" disabled>Run dataset comparison</button>
+        <div id="dataset-research-status" class="research-results-status" role="status">Import and activate a dataset to run a dataset-specific comparison.</div>
+        <div id="dataset-research-summary" class="research-highlight" hidden></div>
+        <div id="dataset-research-table-wrap" class="research-table-wrap hidden">
+          <table class="research-table">
+            <thead><tr><th scope="col">Scoring model</th><th scope="col">Top zone</th><th scope="col">Zones re-ranked</th><th scope="col">Allocations changed</th><th scope="col">Nearest-neighbour km</th><th scope="col">2-opt km</th></tr></thead>
+            <tbody id="dataset-research-results"></tbody>
+          </table>
+        </div>
+        <p id="dataset-research-methods" class="research-caveat hidden"></p>
+        <details class="research-details">
+          <summary>Model definitions and supplementary diagnostics</summary>
+          <p class="research-methods">Models: frequency-only; mean severity; frequency × severity; and severity × recency (30-day window, minimum weight 0.15). All scores are normalized against the highest-scoring zone.</p>
+          <div id="intelligence-status" class="intel-status">Loading dashboard diagnostics…</div>
+          <div id="intelligence-summary" class="intel-summary"></div>
+          <div class="section-title">Observed patterns</div>
+          <div id="intelligence-patterns" class="intel-list"></div>
+          <div class="section-title">Recommendations</div>
+          <div id="intelligence-recommendations" class="intel-list"></div>
+          <div class="section-title">Data quality and limitations</div>
+          <div id="intelligence-evidence" class="intel-evidence"></div>
+        </details>
+      </section>
+
+      <section id="panel-risk" class="panel" role="tabpanel" aria-labelledby="tab-risk">
+        <div class="panel-heading"><div><span class="eyebrow">Live exploratory view</span><h2>Zone map</h2></div></div>
+        <p class="muted">This map shows the current dashboard snapshot using severity × recency. It is separate from the four-model comparison and is not a forecast or operational guide.</p>
+        <div class="legend"><span><i class="dot low"></i>Low</span><span><i class="dot moderate"></i>Moderate</span><span><i class="dot high"></i>High</span><span><i class="dot critical"></i>Critical</span></div>
+        <div class="toggle-row"><label><input type="checkbox" id="toggle-heat" checked /> Heatmap</label><label><input type="checkbox" id="toggle-markers" checked /> Incidents</label></div>
+        <div class="section-title">All zones</div>
+        <ul id="zone-list" class="zone-list"></ul>
+      </section>
+
+      <section id="panel-patrol" class="panel" role="tabpanel" aria-labelledby="tab-patrol">
+        <div class="panel-heading"><div><span class="eyebrow">Interactive demonstration</span><h2>Allocation &amp; routes</h2></div></div>
+        <p class="muted">Explore the live severity × recency model. The canonical four-model results use a fixed 12-officer budget and five stops; this control is separate and does not change those stored results.</p>
+        <label for="p-station">Station</label><select id="p-station"></select>
+        <label for="p-stops">Patrol stops</label><select id="p-stops"><option value="3">Top 3 zones</option><option value="5" selected>Top 5 zones</option><option value="7">Top 7 zones</option></select>
+        <label for="p-officers">Officers on duty</label><input type="number" id="p-officers" min="2" max="40" value="12" />
+        <button id="p-generate" class="btn primary">Generate patrol plan</button>
+        <div id="route-card" class="route-card hidden"></div>
+        <div id="alloc-card" class="alloc-card hidden"></div>
+      </section>
+
+      <section id="panel-analytics" class="panel" role="tabpanel" aria-labelledby="tab-analytics">
+        <div class="panel-heading"><div><span class="eyebrow">Exploratory view</span><h2>Time patterns</h2></div></div>
+        <p class="muted">These charts describe the current dashboard snapshot and are not part of the four-model experiment. Select a chart element to inspect its value.</p>
+        <div class="chart-box"><div class="chart-title"><h3>Incidents by type</h3><span>Click a segment</span></div><div id="chart-type" class="chart" role="img" aria-label="Incidents by type"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Hour of day</h3><span>Click a bar</span></div><div id="chart-hour" class="chart" role="img" aria-label="Incidents by hour"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Last 30 days</h3><span>Click a day</span></div><div id="chart-trend" class="chart" role="img" aria-label="Incidents over the last 30 days"></div></div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="detail" class="detail" aria-hidden="true">
+    <div id="detail-backdrop" class="detail-backdrop"></div>
+    <section class="detail-sheet" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+      <button id="detail-close" class="detail-close" aria-label="Close details">✕</button>
+      <span class="eyebrow">Data detail</span>
+      <h2 id="detail-title">Details</h2>
+      <div id="detail-subtitle" class="detail-subtitle"></div>
+      <div id="detail-body"></div>
+    </section>
+  </div>
+
+  <footer>SurakshyaPath · local dataset workspace · fixed synthetic research benchmark · research prototype</footer>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="js/cursor.js"></script>
+  <script src="js/dataset-import.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
