@@ -29,10 +29,10 @@ app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'geolocation=(self)');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'none'; " +
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://vercel.live; script-src-attr 'none'; " +
     "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; " +
     "img-src 'self' data: blob: https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org; " +
-    "font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; " +
+    "font-src 'self' data:; connect-src 'self' https://vercel.live https://*.vercel-insights.com; worker-src 'self'; manifest-src 'self'; frame-src 'none'; " +
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
   );
   if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
