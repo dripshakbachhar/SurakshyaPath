@@ -3,6 +3,7 @@ node_modules/
 .DS_Store
 *.log
 data/incidents.json
+data/community-reports.json
 data/imported-dataset.json
 data/active-dataset.json
 data/*.tmp
