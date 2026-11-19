@@ -6,9 +6,47 @@ const { randomUUID } = require('crypto');
 
 const FILES = Object.freeze({
   incidents: 'incidents.json',
+  communityReports: 'community-reports.json',
   importedDataset: 'imported-dataset.json',
   activeMode: 'active-dataset.json'
 });
+
+const DEPLOYMENT_MARKERS = [
+  'VERCEL',
+  'RENDER',
+  'FLY_APP_NAME',
+  'RAILWAY_ENVIRONMENT',
+  'K_SERVICE',
+  'AWS_LAMBDA_FUNCTION_NAME',
+  'WEBSITE_INSTANCE_ID'
+];
+
+function isDeploymentEnvironment(env) {
+  return String(env.NODE_ENV || '').toLowerCase() === 'production' ||
+    DEPLOYMENT_MARKERS.some(name => env[name] !== undefined && env[name] !== '');
+}
+
+function resolveOperatingMode(env = process.env) {
+  const requested = env.SURAKSHYA_MODE;
+  const deployed = isDeploymentEnvironment(env);
+
+  if (requested === 'public-read-only') {
+    return { mode: 'public-read-only', reason: 'Public deployments are read-only until durable storage and access control are implemented.' };
+  }
+  if (requested === 'local-research') {
+    if (deployed) {
+      return { mode: 'public-read-only', reason: 'Local research writes are disabled in a detected deployment environment.' };
+    }
+    return { mode: 'local-research', reason: null };
+  }
+  if (requested !== undefined) {
+    return { mode: 'unsupported', reason: 'Unsupported SURAKSHYA_MODE. Use local-research or public-read-only.' };
+  }
+  if (deployed) {
+    return { mode: 'public-read-only', reason: 'Deployment mode is read-only until durable storage and access control are implemented.' };
+  }
+  return { mode: 'local-research', reason: null };
+}
 
 class PersistentStorageError extends Error {
   constructor(message, code, cause) {
@@ -28,9 +66,12 @@ class LocalJsonStorage {
   status() {
     return {
       mode: 'local-json',
-      available: true,
-      writable: true,
-      durable: true,
+      configured: true,
+      available: null,
+      readable: null,
+      writable: null,
+      durable: false,
+      durability: 'Best-effort local filesystem with atomic rename; not a managed database or guaranteed against machine/storage loss.',
       reason: null
     };
   }
@@ -106,9 +147,12 @@ class ReadOnlyStorage {
   status() {
     return {
       mode: 'read-only',
+      configured: false,
       available: false,
+      readable: false,
       writable: false,
       durable: false,
+      durability: 'No persistent storage provider is configured.',
       reason: this.reason
     };
   }
@@ -127,9 +171,10 @@ class ReadOnlyStorage {
 }
 
 function createStorage({ env = process.env, root, fsImpl = fs } = {}) {
-  if (env.VERCEL === '1') {
+  const operatingMode = resolveOperatingMode(env);
+  if (operatingMode.mode !== 'local-research') {
     return new ReadOnlyStorage(
-      'Persistent storage is not configured for this Vercel deployment. Dashboard data is read-only.'
+      operatingMode.reason || 'Persistent writes are disabled for this deployment.'
     );
   }
   return new LocalJsonStorage({
@@ -138,4 +183,11 @@ function createStorage({ env = process.env, root, fsImpl = fs } = {}) {
   });
 }
 
-module.exports = { createStorage, LocalJsonStorage, ReadOnlyStorage, PersistentStorageError };
+module.exports = {
+  createStorage,
+  LocalJsonStorage,
+  ReadOnlyStorage,
+  PersistentStorageError,
+  resolveOperatingMode,
+  isDeploymentEnvironment
+};
