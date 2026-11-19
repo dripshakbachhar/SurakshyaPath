@@ -72,6 +72,7 @@ function buildDatasetResearch(dataset, now = Date.now()) {
   });
   return {
     dataset: {
+      id: dataset.id,
       name: dataset.name,
       records: source.length,
       zones: zones.length,
