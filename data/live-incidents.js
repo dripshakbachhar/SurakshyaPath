@@ -1,14 +1,8 @@
-const fs = require('node:fs');
-const path = require('node:path');
 const { ZONES } = require('../config/zones');
 const Temporal = require('../public/js/temporal');
+const { CSV_FILE, readCanonicalDataset } = require('./canonical-dataset');
 
 const DAY_MS = 86400000;
-const CSV_FILE = path.join(__dirname, 'synthetic_incidents.csv');
-const MIN_LAT = 27.55;
-const MAX_LAT = 27.85;
-const MIN_LNG = 85.15;
-const MAX_LNG = 85.55;
 
 function nearestZone(lat, lng) {
   let best = null;
@@ -23,29 +17,16 @@ function nearestZone(lat, lng) {
   return best;
 }
 
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  const headers = lines.shift().split(',');
-  return lines.map(line => {
-    const values = line.split(',');
-    return Object.fromEntries(headers.map((header, index) => [header, values[index]]));
-  });
-}
-
 function loadSyntheticIncidents(now = Date.now()) {
-  if (!fs.existsSync(CSV_FILE)) {
-    throw new Error(`Canonical synthetic dataset is missing: ${CSV_FILE}`);
-  }
-
   const snapshotNow = Math.floor(now / 60000) * 60000;
-  const rows = parseCsv(fs.readFileSync(CSV_FILE, 'utf8'));
+  const rows = readCanonicalDataset().records;
   return rows.map(row => {
-    const lat = Number(row.latitude);
-    const lng = Number(row.longitude);
-    const ageDays = Number(row.age_days);
+    const lat = row.latitude;
+    const lng = row.longitude;
+    const ageDays = row.ageDays;
     const zone = nearestZone(lat, lng);
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(ageDays) || !zone) {
+    if (!zone) {
       throw new Error(`Invalid synthetic incident record: ${row.id || 'unknown'}`);
     }
 
@@ -54,7 +35,7 @@ function loadSyntheticIncidents(now = Date.now()) {
       id: row.id,
       zone: zone.id,
       type: row.category,
-      severity: Number(row.severity),
+      severity: row.severity,
       ts,
       time: Temporal.dateTime(ts, snapshotNow, 'synthetic'),
       reporter: 'Synthetic simulation',

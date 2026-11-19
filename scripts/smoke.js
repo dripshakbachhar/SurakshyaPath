@@ -17,10 +17,14 @@ function findFreePort() {
   });
 }
 
-async function waitForHealth(base, child) {
+async function waitForHealth(base, child, getSpawnError) {
   const started = Date.now();
   while (Date.now() - started < 10000) {
-    if (child.exitCode !== null) throw new Error('Server exited before becoming healthy.');
+    const spawnError = getSpawnError();
+    if (spawnError) throw new Error(`Could not start smoke-test server: ${spawnError.message}`);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error('Server exited before becoming healthy.');
+    }
     try {
       const response = await fetch(base + '/api/health');
       if (response.ok) return;
@@ -28,6 +32,28 @@ async function waitForHealth(base, child) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   throw new Error('Timed out waiting for /api/health.');
+}
+
+async function stopChild(child, spawnError, isClosed) {
+  if (spawnError || isClosed() || child.exitCode !== null || child.signalCode !== null) return;
+
+  const closed = new Promise(resolve => child.once('close', resolve));
+  child.kill('SIGTERM');
+  let timeout;
+  const didClose = await Promise.race([
+    closed.then(() => true),
+    new Promise(resolve => { timeout = setTimeout(() => resolve(false), 1500); })
+  ]);
+  clearTimeout(timeout);
+  if (didClose) return;
+
+  child.kill('SIGKILL');
+  const didStop = await Promise.race([
+    closed.then(() => true),
+    new Promise(resolve => { timeout = setTimeout(() => resolve(false), 2000); })
+  ]);
+  clearTimeout(timeout);
+  if (!didStop) throw new Error('Smoke-test server did not stop after termination.');
 }
 
 async function json(base, path, options) {
@@ -50,12 +76,16 @@ async function json(base, path, options) {
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
+  let spawnError = null;
+  let childClosed = false;
+  child.once('error', error => { spawnError = error; });
+  child.once('close', () => { childClosed = true; });
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk.toString(); });
 
   try {
     const base = `http://127.0.0.1:${port}`;
-    await waitForHealth(base, child);
+    await waitForHealth(base, child, () => spawnError);
 
     const before = await json(base, '/api/dashboard');
     const intelligence = await json(base, '/api/intelligence');
@@ -81,13 +111,11 @@ async function json(base, path, options) {
 
     console.log('Smoke test passed: health → data → intelligence → create incident → dashboard propagation.');
   } finally {
-    if (child.exitCode === null) {
-      await new Promise(resolve => {
-        child.once('exit', resolve);
-        child.kill('SIGTERM');
-      });
+    try {
+      await stopChild(child, spawnError, () => childClosed);
+    } finally {
+      fs.rmSync(storageRoot, { recursive: true, force: true });
     }
-    fs.rmSync(storageRoot, { recursive: true, force: true });
     if (child.exitCode && child.exitCode !== 0) console.error(stderr);
   }
 })().catch(error => {

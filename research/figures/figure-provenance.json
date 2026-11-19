@@ -1,0 +1,75 @@
+{
+  "provenance": {
+    "experimentId": "research-figures",
+    "sourceDataset": {
+      "id": "synthetic-robustness-scenarios-v1",
+      "name": "Five deterministic synthetic scenario replications",
+      "schemaVersion": null,
+      "contentHash": {
+        "algorithm": "sha256",
+        "representation": "JSON.stringify UTF-8 bytes",
+        "value": "febd8fafde6721edc6e3d17a744ee88ae601f62fcf40416c9daa5ef577486df1"
+      },
+      "recordCount": 1567,
+      "zoneCount": 10,
+      "scenarioCount": 5
+    },
+    "randomSeed": null,
+    "randomSeeds": [
+      208304,
+      208305,
+      208306,
+      208307,
+      208308
+    ],
+    "modelConfiguration": {
+      "sourceExperiment": "synthetic-robustness-analysis",
+      "figures": [
+        "risk-model-comparison.svg",
+        "allocation-comparison.svg",
+        "robustness-comparison.svg",
+        "patrol-comparison.svg"
+      ]
+    },
+    "inputArtifacts": [
+      {
+        "path": "experiments/results/robustness/robustness-summary.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "06812bd0aa3cb71e7f4cd9aed0ccbe1fc8111e9787d2c00ff7730c770a2f43fd"
+        }
+      },
+      {
+        "path": "experiments/results/robustness/robustness-summary.json",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "00225caa2aa15b666dd3d4b396f92b4a0ffebbd6f8bbe8dfed017225b52edb78"
+        }
+      }
+    ],
+    "softwareVersion": "1.1.0",
+    "commit": null,
+    "executedAt": "2026-11-19T07:36:05.853Z",
+    "metrics": {
+      "topZoneConsistency": {
+        "unit": "scenario replications"
+      },
+      "rankShift": {
+        "unit": "mean absolute rank positions"
+      },
+      "allocationChanges": {
+        "unit": "zone allocations"
+      },
+      "patrolDistance": {
+        "unit": "kilometres"
+      }
+    },
+    "exclusions": [],
+    "warnings": [
+      "Figures visualize deterministic synthetic experiments and are not real-world operational guidance."
+    ],
+    "executionStatus": "success"
+  }
+}

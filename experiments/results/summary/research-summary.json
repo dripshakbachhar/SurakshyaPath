@@ -1,4 +1,108 @@
 {
+  "provenance": {
+    "experimentId": "consolidated-research-summary",
+    "sourceDataset": {
+      "id": "canonical-synthetic-benchmark-v1",
+      "name": "Deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+      "schemaVersion": null,
+      "contentHash": {
+        "algorithm": "sha256",
+        "representation": "UTF-8 text with line endings normalized to LF",
+        "value": "ab7d1f65ce3243b6c3ea05780a7172b5aa3db253ca2abc57ba8fc8a41d9b674c"
+      },
+      "recordCount": 1567,
+      "zoneCount": 10,
+      "scenarioCount": null
+    },
+    "randomSeed": 208304,
+    "randomSeeds": null,
+    "modelConfiguration": {
+      "models": [
+        "frequency-only",
+        "severity-only",
+        "frequency-severity",
+        "current-severity-recency"
+      ],
+      "riskReferenceModel": "frequency-only",
+      "allocationReferenceModel": "frequency-only",
+      "officerBudget": 12,
+      "allocationBudgets": [
+        6,
+        12,
+        20
+      ],
+      "routePriorityZoneCount": 5
+    },
+    "inputArtifacts": [
+      {
+        "path": "frequency-only.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "fc4e056f741a29f26d8f894fe686f8630ba16986a2272890f86338936331a17b"
+        }
+      },
+      {
+        "path": "severity-only.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "6f8a76e2ebdaab604d43fd898cc1c108f3a58d7b53273ec4acfd79e7be39d4d0"
+        }
+      },
+      {
+        "path": "frequency-severity.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "5c0ed2ee3c69b93e8190835b778966bfb11e8af51ac2d25366b6803d4bf2ff24"
+        }
+      },
+      {
+        "path": "current-severity-recency.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "79b464f338d6d3e6353bda65657e9b0a053e90621552cd4e1eaaa8014c6a9c3b"
+        }
+      },
+      {
+        "path": "allocation/allocation-comparison.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "59dba464a1d6ce6c139c765b1d9aeebc0cb84a324f3b505176f438e940f616fd"
+        }
+      },
+      {
+        "path": "patrol/route-comparison.csv",
+        "contentHash": {
+          "algorithm": "sha256",
+          "representation": "file-bytes",
+          "value": "1e975b8737ca797b569dcad9c5490e338847522058b17af5456cde9abf7f009f"
+        }
+      }
+    ],
+    "softwareVersion": "1.1.0",
+    "commit": null,
+    "executedAt": "2026-11-19T07:36:05.442Z",
+    "metrics": {
+      "riskRankShift": {
+        "unit": "rank positions vs frequency-only"
+      },
+      "allocationChange": {
+        "unit": "officer units vs frequency-only"
+      },
+      "patrolDistance": {
+        "unit": "kilometres"
+      }
+    },
+    "exclusions": [],
+    "warnings": [
+      "Consolidated metrics summarize synthetic computational comparisons; they do not establish that any model is universally superior."
+    ],
+    "executionStatus": "success"
+  },
   "dataset": "deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
   "risk_reference_model": "frequency-only",
   "allocation_reference_model": "frequency-only",

@@ -6,6 +6,7 @@ const { RESEARCH_SEVERITY } = require("../config/severity");
 const { scoreModels } = require("../algorithms/research-models");
 const { computeAllocation } = require("../algorithms/allocation");
 const { computePatrol } = require("../algorithms/routing");
+const { createExperimentProvenance, hashJson } = require("./provenance");
 
 const COUNT = 1567;
 const SEEDS = [208304, 208305, 208306, 208307, 208308];
@@ -71,8 +72,7 @@ function rank(scores) {
     .map(([zone], index) => ({ zone, rank: index + 1 }));
 }
 
-function summarizeSeed(seed) {
-  const incidents = generate(seed);
+function summarizeSeed(seed, incidents) {
   const counts = Object.fromEntries(zoneNames.map(zone => [zone, 0]));
   incidents.forEach(incident => counts[incident.zone]++);
 
@@ -106,7 +106,8 @@ function summarizeSeed(seed) {
 const resultsDir = path.join(__dirname, "results", "robustness");
 fs.mkdirSync(resultsDir, { recursive: true });
 
-const results = SEEDS.map(summarizeSeed);
+const scenarios = SEEDS.map(seed => ({ seed, incidents: generate(seed) }));
+const results = scenarios.map(({ seed, incidents }) => summarizeSeed(seed, incidents));
 
 const baseline = "frequency-only";
 const summary = [];
@@ -155,6 +156,40 @@ fs.writeFileSync(
 fs.writeFileSync(
   path.join(resultsDir, "robustness-summary.json"),
   JSON.stringify({
+    provenance: createExperimentProvenance({
+      experimentId: "synthetic-robustness-analysis",
+      sourceDataset: {
+        id: "synthetic-robustness-scenarios-v1",
+        name: "Five deterministic synthetic scenario replications",
+        schemaVersion: null,
+        contentHash: hashJson(scenarios),
+        recordCount: COUNT,
+        zoneCount: ZONES.length,
+        scenarioCount: SEEDS.length
+      },
+      randomSeeds: SEEDS,
+      modelConfiguration: {
+        models,
+        recordsPerScenario: COUNT,
+        coordinateBounds: bounds,
+        categoryCounts: {
+          theft: 626,
+          suspicious: 391,
+          harassment: 313,
+          infrastructure: COUNT - 1330
+        },
+        officerBudget: OFFICERS,
+        priorityZoneCount: STOP_COUNT,
+        baselineModel: baseline
+      },
+      metrics: {
+        meanAbsoluteRankShift: { unit: "rank positions vs frequency-only" },
+        changedAllocationZones: { unit: "zones vs frequency-only" },
+        patrolDistance: { unit: "kilometres" }
+      },
+      exclusions: [],
+      warnings: ["Seeded scenarios are deterministic replications, not independent observations or evidence of population-level generalization."]
+    }),
     dataset_count: COUNT,
     seeds: SEEDS,
     officer_budget: OFFICERS,

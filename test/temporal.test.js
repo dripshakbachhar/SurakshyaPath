@@ -91,6 +91,40 @@ test('known future records are excluded and unknown times make window counts una
   assert.equal(withUnknown.unknown, 1);
 });
 
+test('window counts distinguish contained intervals, boundary overlap, empty input, and exact-now events', () => {
+  const start = Date.UTC(2026, 8, 30);
+  const end = start + Temporal.DAY_MS - 1;
+  const exactAtStart = { ts: start, time: Temporal.exactTime(start) };
+  const exactAtEnd = { ts: end, time: Temporal.exactTime(end) };
+  const dateOnly = { ts: start, time: Temporal.dateTime(start, end) };
+  const containedRange = {
+    ts: start,
+    time: { precision: 'range', origin: 'imported', start, end, window: null }
+  };
+  const overlappingRange = {
+    ts: start - 1,
+    time: { precision: 'range', origin: 'imported', start: start - 1, end: start + 1, window: null }
+  };
+
+  assert.deepEqual(Temporal.countInWindow([], start, end, end), {
+    value: 0, status: 'AVAILABLE', included: 0, ambiguous: 0, unknown: 0, future: 0, outside: 0
+  });
+  assert.equal(Temporal.classifyWindow(exactAtStart, start, end, end), 'included');
+  assert.equal(Temporal.classifyWindow(exactAtEnd, start, end, end), 'included');
+  assert.equal(Temporal.classifyWindow(dateOnly, start, end, end), 'included');
+  assert.equal(Temporal.classifyWindow(containedRange, start, end, end), 'included');
+  assert.equal(Temporal.classifyWindow(overlappingRange, start, end, end), 'ambiguous');
+  const mixed = Temporal.countInWindow(
+    [exactAtEnd, dateOnly, overlappingRange],
+    start,
+    end,
+    end
+  );
+  assert.equal(mixed.value, null);
+  assert.equal(mixed.included, 2);
+  assert.equal(mixed.ambiguous, 1);
+});
+
 test('UTC hour and calendar-date results are invariant across process timezones', () => {
   const modulePath = JSON.stringify(require.resolve('../public/js/temporal'));
   const script = `const t=require(${modulePath});const ts=Date.UTC(2026,8,30,23);const r={ts,time:t.exactTime(ts)};console.log(JSON.stringify([t.eventHour(r,ts),t.utcDayStart(ts),t.dateKey(r,ts)]));`;

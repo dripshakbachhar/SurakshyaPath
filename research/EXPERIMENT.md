@@ -176,16 +176,23 @@ The experiment should be reproducible from the repository using the documented n
 Current experiment commands:
 
 ```text
+npm.cmd run research
 npm.cmd run research-experiments
 npm.cmd run patrol-experiments
 npm.cmd run allocation-experiments
 npm.cmd run robustness-experiments
+npm.cmd run figures
 npm.cmd run validate
 ```
 
+The research scripts consume the checked-in canonical CSV through a shared
+strict reader. A missing or malformed canonical input is an error; experiment
+scripts do not silently regenerate it.
+
 The validation script checks:
 
-- dataset size,
+- the canonical CSV schema, record count, identifiers, coordinates, categories,
+  severities, and temporal-age values,
 - zone assignment coverage,
 - model output structure,
 - model determinism,
@@ -203,9 +210,27 @@ Current result groups include:
 
 - risk-model comparisons,
 - patrol-route comparisons,
-- resource-allocation comparisons.
+- resource-allocation comparisons,
+- multi-seed robustness summaries,
+- consolidated research summaries and figures.
 
 CSV files are intended for tabular analysis; JSON files preserve machine-readable summaries.
+
+Experiment JSON outputs include a `provenance` object with the source dataset
+identifier, SHA-256 content hash, record and zone counts, model configuration,
+metric units, exclusions, warnings, software version, and UTC execution time.
+The canonical CSV hash covers UTF-8 content with CRLF/CR line endings
+normalized to LF; the in-memory robustness scenario hash covers deterministic
+`JSON.stringify` UTF-8 bytes. The consolidated summary and figure provenance
+hash the exact CSV/JSON file bytes they consume. A dataset schema version is
+reported as `null` because the canonical CSV has no separately versioned
+schema. A commit identifier is
+included when `GITHUB_SHA` is set; otherwise it is explicitly `null`.
+
+Numerical results and source hashes are reproducibility targets. Execution
+timestamps (and therefore hashes of JSON files containing those timestamps)
+vary between runs. Compare the reported model outputs and exact source hashes,
+not the complete JSON bytes, when checking deterministic reruns.
 
 ## 13. Analysis plan
 
@@ -251,13 +276,13 @@ The risk models encode different assumptions about what constitutes priority. Th
 A reproduction should:
 
 1. Use the repository version containing the experiment scripts.
-2. Generate or use the documented 1,567-record synthetic dataset.
+2. Use the checked-in canonical 1,567-record synthetic dataset.
 3. Preserve the documented random seed.
 4. Preserve the canonical zone configuration.
-5. Run the research, patrol, and allocation experiment commands.
-6. Run the validation command.
-7. Compare generated outputs with the stored experiment results.
-8. Record any differences in software version, parameters, dataset, or configuration.
+5. Run `npm.cmd run research`, followed by `npm.cmd run figures`.
+6. Run `npm.cmd run validate`.
+7. Compare numerical results and provenance hashes with the stored outputs.
+8. Record differences in software version, parameters, source hash, or configuration.
 
 ## 16. Implementation map
 

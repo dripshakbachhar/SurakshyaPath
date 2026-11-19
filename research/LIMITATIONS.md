@@ -96,6 +96,14 @@ The project currently has strong reproducibility properties: deterministic input
 
 Reproducibility does not remove validity limitations. A perfectly reproducible experiment can still model the wrong phenomenon or use unrealistic assumptions. The research therefore reports reproducibility and validity as separate properties.
 
+Generated experiment summaries record exact source/artifact hashes and the
+available software version, commit identifier, configuration, units, and
+execution time. These metadata establish which inputs and settings produced an
+output; they do not verify the quality of the assumptions or make the synthetic
+scenarios representative. Execution timestamps also mean that complete JSON
+files are not byte-identical across reruns, even when their analytical values
+are deterministic.
+
 ## 13. Future evidence
 
 A stronger future study could:

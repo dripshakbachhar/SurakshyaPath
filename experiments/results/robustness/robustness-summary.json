@@ -1,4 +1,72 @@
 {
+  "provenance": {
+    "experimentId": "synthetic-robustness-analysis",
+    "sourceDataset": {
+      "id": "synthetic-robustness-scenarios-v1",
+      "name": "Five deterministic synthetic scenario replications",
+      "schemaVersion": null,
+      "contentHash": {
+        "algorithm": "sha256",
+        "representation": "JSON.stringify UTF-8 bytes",
+        "value": "febd8fafde6721edc6e3d17a744ee88ae601f62fcf40416c9daa5ef577486df1"
+      },
+      "recordCount": 1567,
+      "zoneCount": 10,
+      "scenarioCount": 5
+    },
+    "randomSeed": null,
+    "randomSeeds": [
+      208304,
+      208305,
+      208306,
+      208307,
+      208308
+    ],
+    "modelConfiguration": {
+      "models": [
+        "frequency-only",
+        "severity-only",
+        "frequency-severity",
+        "current-severity-recency"
+      ],
+      "recordsPerScenario": 1567,
+      "coordinateBounds": {
+        "minLat": 27.6,
+        "maxLat": 27.78,
+        "minLon": 85.2,
+        "maxLon": 85.5
+      },
+      "categoryCounts": {
+        "theft": 626,
+        "suspicious": 391,
+        "harassment": 313,
+        "infrastructure": 237
+      },
+      "officerBudget": 12,
+      "priorityZoneCount": 5,
+      "baselineModel": "frequency-only"
+    },
+    "inputArtifacts": [],
+    "softwareVersion": "1.1.0",
+    "commit": null,
+    "executedAt": "2026-11-19T07:36:05.367Z",
+    "metrics": {
+      "meanAbsoluteRankShift": {
+        "unit": "rank positions vs frequency-only"
+      },
+      "changedAllocationZones": {
+        "unit": "zones vs frequency-only"
+      },
+      "patrolDistance": {
+        "unit": "kilometres"
+      }
+    },
+    "exclusions": [],
+    "warnings": [
+      "Seeded scenarios are deterministic replications, not independent observations or evidence of population-level generalization."
+    ],
+    "executionStatus": "success"
+  },
   "dataset_count": 1567,
   "seeds": [
     208304,

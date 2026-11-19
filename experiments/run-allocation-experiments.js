@@ -1,32 +1,24 @@
 const fs=require("fs");
 const path=require("path");
 
-const dataDir=path.join(__dirname,"..","data");
 const resultsDir=path.join(__dirname,"results","allocation");
-const input=path.join(dataDir,"synthetic_incidents.csv");
-if(!fs.existsSync(input)) require("../data/generate-synthetic");
 
 const { ZONES }=require("../config/zones");
 const { computeAllocation }=require("../algorithms/allocation");
 const { scoreModels }=require("../algorithms/research-models");
+const { readCanonicalDataset }=require("../data/canonical-dataset");
+const { nearestZone }=require("../data/live-incidents");
+const { createExperimentProvenance }=require("./provenance");
 
 const zones=ZONES.map(({name,lat,lng})=>({name,lat,lng}));
 const OFFICER_COUNTS=[6,12,20];
 
-function parseCsv(text){
-  const lines=text.trim().split(/\r?\n/),headers=lines.shift().split(",");
-  return lines.map(line=>{const values=line.split(",");return Object.fromEntries(headers.map((h,i)=>[h,values[i]]));});
-}
-function nearestZone(lat,lng){
-  let best=zones[0],bestD=Infinity;
-  for(const zone of zones){const d=Math.hypot(lat-zone.lat,lng-zone.lng);if(d<bestD){best=zone;bestD=d;}}
-  return best.name;
-}
 const round=n=>Number(n.toFixed(4));
 
-const incidents=parseCsv(fs.readFileSync(input,"utf8")).map(r=>({
-  severity:Number(r.severity),ageDays:Number(r.age_days),
-  zone:nearestZone(Number(r.latitude),Number(r.longitude))
+const dataset=readCanonicalDataset();
+const incidents=dataset.records.map(record=>({
+  severity:record.severity,ageDays:record.ageDays,
+  zone:nearestZone(record.latitude,record.longitude).name
 }));
 
 const models=scoreModels(incidents,zones.map(z=>z.name));
@@ -66,7 +58,23 @@ const csv=[
 
 fs.writeFileSync(path.join(resultsDir,"allocation-comparison.csv"),csv);
 fs.writeFileSync(path.join(resultsDir,"allocation-summary.json"),JSON.stringify({
-  dataset:"deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+  provenance:createExperimentProvenance({
+    experimentId:"resource-allocation-comparison",
+    sourceDataset:{...dataset,zoneCount:ZONES.length},
+    randomSeed:208304,
+    modelConfiguration:{
+      models:Object.keys(models),
+      budgets:OFFICER_COUNTS,
+      allocationMethod:"largest remainder",
+      scoreNormalization:"maximum zone score is 100"
+    },
+    metrics:{
+      allocatedUnits:{unit:"units"},
+      budgetTotal:{unit:"units per model and budget"}
+    },
+    exclusions:[],
+    warnings:["Allocations are mathematical experiment outputs, not validated real-world resource plans."]
+  }),
   officerCounts:OFFICER_COUNTS,
   method:"computeAllocation: largest-remainder proportional allocation using normalized risk scores",
   models:modelSummary,

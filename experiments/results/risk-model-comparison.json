@@ -1,0 +1,261 @@
+{
+  "provenance": {
+    "experimentId": "risk-model-comparison",
+    "sourceDataset": {
+      "id": "canonical-synthetic-benchmark-v1",
+      "name": "Deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+      "schemaVersion": null,
+      "contentHash": {
+        "algorithm": "sha256",
+        "representation": "UTF-8 text with line endings normalized to LF",
+        "value": "ab7d1f65ce3243b6c3ea05780a7172b5aa3db253ca2abc57ba8fc8a41d9b674c"
+      },
+      "recordCount": 1567,
+      "zoneCount": 10,
+      "scenarioCount": null
+    },
+    "randomSeed": 208304,
+    "randomSeeds": null,
+    "modelConfiguration": {
+      "models": [
+        "frequency-only",
+        "severity-only",
+        "frequency-severity",
+        "current-severity-recency"
+      ],
+      "scoreNormalization": "Maximum zone score is 100.",
+      "recencyWindowDays": 30,
+      "recencyMinimumWeight": 0.15
+    },
+    "inputArtifacts": [],
+    "softwareVersion": "1.1.0",
+    "commit": null,
+    "executedAt": "2026-11-19T07:36:05.115Z",
+    "metrics": {
+      "zoneScore": {
+        "unit": "normalized points, 0-100"
+      },
+      "rank": {
+        "unit": "ordinal position, 1 is highest"
+      },
+      "incidentCount": {
+        "unit": "records"
+      }
+    },
+    "exclusions": [],
+    "warnings": [
+      "Synthetic scenario results are descriptive and do not establish real-world risk or model superiority."
+    ],
+    "executionStatus": "success"
+  },
+  "models": {
+    "frequency-only": [
+      {
+        "zone": "Bouddha",
+        "rank": 1,
+        "score": 100
+      },
+      {
+        "zone": "Koteshwor",
+        "rank": 2,
+        "score": 83.1797
+      },
+      {
+        "zone": "Kirtipur",
+        "rank": 3,
+        "score": 59.2166
+      },
+      {
+        "zone": "Balaju",
+        "rank": 4,
+        "score": 33.4101
+      },
+      {
+        "zone": "Kalimati",
+        "rank": 5,
+        "score": 29.7235
+      },
+      {
+        "zone": "Patan",
+        "rank": 6,
+        "score": 26.9585
+      },
+      {
+        "zone": "Gongabu",
+        "rank": 7,
+        "score": 10.1382
+      },
+      {
+        "zone": "Chabahil",
+        "rank": 8,
+        "score": 8.9862
+      },
+      {
+        "zone": "Thamel",
+        "rank": 9,
+        "score": 4.8387
+      },
+      {
+        "zone": "New Baneshwor",
+        "rank": 10,
+        "score": 4.6083
+      }
+    ],
+    "severity-only": [
+      {
+        "zone": "Thamel",
+        "rank": 1,
+        "score": 100
+      },
+      {
+        "zone": "Chabahil",
+        "rank": 2,
+        "score": 96.9231
+      },
+      {
+        "zone": "Kirtipur",
+        "rank": 3,
+        "score": 95.8074
+      },
+      {
+        "zone": "Koteshwor",
+        "rank": 4,
+        "score": 95.5471
+      },
+      {
+        "zone": "Bouddha",
+        "rank": 5,
+        "score": 94.5968
+      },
+      {
+        "zone": "Kalimati",
+        "rank": 6,
+        "score": 93.6047
+      },
+      {
+        "zone": "Gongabu",
+        "rank": 7,
+        "score": 93.0682
+      },
+      {
+        "zone": "Balaju",
+        "rank": 8,
+        "score": 91.9655
+      },
+      {
+        "zone": "Patan",
+        "rank": 9,
+        "score": 91.0897
+      },
+      {
+        "zone": "New Baneshwor",
+        "rank": 10,
+        "score": 89.25
+      }
+    ],
+    "frequency-severity": [
+      {
+        "zone": "Bouddha",
+        "rank": 1,
+        "score": 100
+      },
+      {
+        "zone": "Koteshwor",
+        "rank": 2,
+        "score": 84.0153
+      },
+      {
+        "zone": "Kirtipur",
+        "rank": 3,
+        "score": 59.9744
+      },
+      {
+        "zone": "Balaju",
+        "rank": 4,
+        "score": 32.4808
+      },
+      {
+        "zone": "Kalimati",
+        "rank": 5,
+        "score": 29.4118
+      },
+      {
+        "zone": "Patan",
+        "rank": 6,
+        "score": 25.9591
+      },
+      {
+        "zone": "Gongabu",
+        "rank": 7,
+        "score": 9.9744
+      },
+      {
+        "zone": "Chabahil",
+        "rank": 8,
+        "score": 9.2072
+      },
+      {
+        "zone": "Thamel",
+        "rank": 9,
+        "score": 5.1151
+      },
+      {
+        "zone": "New Baneshwor",
+        "rank": 10,
+        "score": 4.3478
+      }
+    ],
+    "current-severity-recency": [
+      {
+        "zone": "Bouddha",
+        "rank": 1,
+        "score": 100
+      },
+      {
+        "zone": "Koteshwor",
+        "rank": 2,
+        "score": 83.1269
+      },
+      {
+        "zone": "Kirtipur",
+        "rank": 3,
+        "score": 60.6376
+      },
+      {
+        "zone": "Balaju",
+        "rank": 4,
+        "score": 32.6904
+      },
+      {
+        "zone": "Kalimati",
+        "rank": 5,
+        "score": 31.2812
+      },
+      {
+        "zone": "Patan",
+        "rank": 6,
+        "score": 25.4822
+      },
+      {
+        "zone": "Gongabu",
+        "rank": 7,
+        "score": 10.7939
+      },
+      {
+        "zone": "Chabahil",
+        "rank": 8,
+        "score": 10.3838
+      },
+      {
+        "zone": "Thamel",
+        "rank": 9,
+        "score": 6.2457
+      },
+      {
+        "zone": "New Baneshwor",
+        "rank": 10,
+        "score": 4.9624
+      }
+    ]
+  }
+}

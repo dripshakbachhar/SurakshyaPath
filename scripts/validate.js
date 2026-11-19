@@ -1,40 +1,23 @@
 const assert = require("node:assert/strict");
-const fs = require("fs");
-const path = require("path");
 
 const { ZONES } = require("../config/zones");
+const { readCanonicalDataset } = require("../data/canonical-dataset");
+const { nearestZone } = require("../data/live-incidents");
 const { scoreModels } = require("../algorithms/research-models");
 const { computeAllocation } = require("../algorithms/allocation");
 const { computePatrol } = require("../algorithms/routing");
 const { computeZones } = require("../algorithms/risk");
 const Temporal = require("../public/js/temporal");
 
-const csv = fs.readFileSync(
-  path.join(__dirname, "../data/synthetic_incidents.csv"),
-  "utf8"
-).trim().split(/\r?\n/);
+const dataset = readCanonicalDataset();
+assert.equal(dataset.recordCount, 1567, "synthetic dataset must contain 1567 records");
+assert.match(dataset.contentHash.value, /^[a-f0-9]{64}$/);
 
-assert.equal(csv.length - 1, 1567, "synthetic dataset must contain 1567 records");
-
-const headers = csv.shift().split(",");
-const incidents = csv.map(line => {
-  const values = line.split(",");
-  return Object.fromEntries(headers.map((h, i) => [h, values[i]]));
-}).map(r => ({
-  severity: Number(r.severity),
-  ageDays: Number(r.age_days),
-  latitude: Number(r.latitude),
-  longitude: Number(r.longitude)
+const incidents = dataset.records.map(record => ({
+  severity: record.severity,
+  ageDays: record.ageDays,
+  zone: nearestZone(record.latitude, record.longitude).name
 }));
-
-function nearestZone(lat, lng) {
-  return ZONES.reduce((best, zone) => {
-    const d = Math.hypot(lat - zone.lat, lng - zone.lng);
-    return d < best.d ? { zone, d } : best;
-  }, { zone: ZONES[0], d: Infinity }).zone.name;
-}
-
-for (const incident of incidents) incident.zone = nearestZone(incident.latitude, incident.longitude);
 
 const zoneNames = ZONES.map(zone => zone.name);
 const counts = Object.fromEntries(zoneNames.map(zone => [zone, 0]));

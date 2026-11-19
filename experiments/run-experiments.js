@@ -1,35 +1,12 @@
 const fs = require("fs");
 const path = require("path");
 
-const dataDir = path.join(__dirname, "..", "data");
 const outputDir = path.join(__dirname, "results");
-const input = path.join(dataDir, "synthetic_incidents.csv");
-
-if (!fs.existsSync(input)) {
-  require("../data/generate-synthetic");
-}
-
 const { ZONES } = require("../config/zones");
 const zones = ZONES.map(z => [z.name, z.lat, z.lng]);
-
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  const headers = lines.shift().split(",");
-  return lines.map(line => {
-    const values = line.split(",");
-    return Object.fromEntries(headers.map((h, i) => [h, values[i]]));
-  });
-}
-
-function nearestZone(lat, lon) {
-  let best = zones[0];
-  let bestD = Infinity;
-  for (const zone of zones) {
-    const d = Math.hypot(lat - zone[1], lon - zone[2]);
-    if (d < bestD) { best = zone; bestD = d; }
-  }
-  return best[0];
-}
+const { readCanonicalDataset } = require("../data/canonical-dataset");
+const { nearestZone } = require("../data/live-incidents");
+const { createExperimentProvenance } = require("./provenance");
 
 function rank(scores) {
   return Object.entries(scores)
@@ -41,11 +18,11 @@ function bRound(n) {
   return Number(n.toFixed(4));
 }
 
-const incidents = parseCsv(fs.readFileSync(input, "utf8")).map(r => ({
-  ...r,
-  severity: Number(r.severity),
-  ageDays: Number(r.age_days),
-  zone: nearestZone(Number(r.latitude), Number(r.longitude))
+const dataset = readCanonicalDataset();
+const incidents = dataset.records.map(record => ({
+  severity: record.severity,
+  ageDays: record.ageDays,
+  zone: nearestZone(record.latitude, record.longitude).name
 }));
 
 const frequency = Object.fromEntries(zones.map(z => [z[0], 0]));
@@ -88,6 +65,29 @@ fs.writeFileSync(
     "```",
     "",
   ].join("\n")
+);
+fs.writeFileSync(
+  path.join(outputDir, "risk-model-comparison.json"),
+  JSON.stringify({
+    provenance: createExperimentProvenance({
+      experimentId: "risk-model-comparison",
+      sourceDataset: { ...dataset, zoneCount: zones.length },
+      randomSeed: 208304,
+      modelConfiguration: {
+        models: Object.keys(models),
+        scoreNormalization: "Maximum zone score is 100.",
+        recencyWindowDays: 30,
+        recencyMinimumWeight: 0.15
+      },
+      metrics: {
+        zoneScore: { unit: "normalized points, 0-100" },
+        rank: { unit: "ordinal position, 1 is highest" },
+        incidentCount: { unit: "records" }
+      },
+      warnings: ["Synthetic scenario results are descriptive and do not establish real-world risk or model superiority."]
+    }),
+    models: comparison
+  }, null, 2) + "\n"
 );
 
 console.log(`Generated experiment outputs for ${incidents.length} synthetic records.`);

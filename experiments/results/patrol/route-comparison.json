@@ -1,5 +1,64 @@
 {
-  "dataset": "deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+  "provenance": {
+    "experimentId": "patrol-route-comparison",
+    "sourceDataset": {
+      "id": "canonical-synthetic-benchmark-v1",
+      "name": "Deterministic synthetic Shrawan 2083 Kathmandu Valley dataset",
+      "schemaVersion": null,
+      "contentHash": {
+        "algorithm": "sha256",
+        "representation": "UTF-8 text with line endings normalized to LF",
+        "value": "ab7d1f65ce3243b6c3ea05780a7172b5aa3db253ca2abc57ba8fc8a41d9b674c"
+      },
+      "recordCount": 1567,
+      "zoneCount": 10,
+      "scenarioCount": null
+    },
+    "randomSeed": 208304,
+    "randomSeeds": null,
+    "modelConfiguration": {
+      "models": [
+        "frequency-only",
+        "severity-only",
+        "frequency-severity",
+        "current-severity-recency"
+      ],
+      "station": {
+        "id": "mpr-ratna-park",
+        "name": "MPR Ratna Park",
+        "lat": 27.705,
+        "lng": 85.315
+      },
+      "priorityZoneCount": 5,
+      "routeAlgorithm": "nearest-neighbour followed by open-route 2-opt",
+      "distanceMethod": "great-circle coordinate distance"
+    },
+    "inputArtifacts": [],
+    "softwareVersion": "1.1.0",
+    "commit": null,
+    "executedAt": "2026-11-19T07:36:05.197Z",
+    "metrics": {
+      "nearestNeighbourDistance": {
+        "unit": "kilometres"
+      },
+      "optimizedDistance": {
+        "unit": "kilometres"
+      },
+      "distanceSaved": {
+        "unit": "kilometres"
+      },
+      "distanceSavedPercent": {
+        "unit": "percent"
+      }
+    },
+    "exclusions": [
+      "Only the 5 highest-priority zones per model are routed."
+    ],
+    "warnings": [
+      "Distances are coordinate-based, not road-network travel estimates; outputs do not establish operational effectiveness."
+    ],
+    "executionStatus": "success"
+  },
   "station": {
     "id": "mpr-ratna-park",
     "name": "MPR Ratna Park",

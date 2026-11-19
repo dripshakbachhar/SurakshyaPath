@@ -45,6 +45,7 @@ New anonymous report
 - `data/community-reports.json`: local community submissions, distinct from synthetic and imported records.
 - `data/imported-dataset.json` and `data/active-dataset.json`: separate imported dataset and active-mode pointer.
 - `data/synthetic_incidents.csv`: research dataset; separate from live demo storage.
+- `data/canonical-dataset.js`: shared strict CSV reader and content-hash source for the canonical benchmark and experiment scripts.
 - `algorithms/`: deterministic analytical components.
 - `server.js`: API composition and persistence boundary; it depends on the storage interface, not filesystem operations.
 - `storage/json-storage.js`: atomic local JSON adapter and read-only deployment adapter.
@@ -83,6 +84,13 @@ generated patrol plan in `localStorage`, and explicitly run research/figure
 scripts write derived outputs under `experiments/`. The synthetic-data generator
 also writes its canonical CSV only when explicitly invoked. These are not
 server-side user-data stores.
+
+The research and figure pipelines record input content hashes, available
+software/commit identifiers, execution time, model configuration, metric units,
+and warnings in JSON provenance. Their CSV readers validate headers, row
+counts, numeric fields, and expected model/zone coverage before summarizing
+results. These checks support traceability and reproducible computation; they
+do not establish empirical validity.
 
 ## Important boundary
 
