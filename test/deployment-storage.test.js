@@ -9,15 +9,19 @@ const ImportLimits = require('../public/js/import-limits');
 
 const previousVercel = process.env.VERCEL;
 const previousDataDir = process.env.SURAKSHYA_DATA_DIR;
+const previousMode = process.env.SURAKSHYA_MODE;
 const storageParent = fs.mkdtempSync(path.join(os.tmpdir(), 'surakshyapath-vercel-'));
 const storageRoot = path.join(storageParent, 'runtime-data');
 process.env.VERCEL = '1';
 process.env.SURAKSHYA_DATA_DIR = storageRoot;
+process.env.SURAKSHYA_MODE = 'local-research';
 const { app } = require('../server');
 if (previousVercel === undefined) delete process.env.VERCEL;
 else process.env.VERCEL = previousVercel;
 if (previousDataDir === undefined) delete process.env.SURAKSHYA_DATA_DIR;
 else process.env.SURAKSHYA_DATA_DIR = previousDataDir;
+if (previousMode === undefined) delete process.env.SURAKSHYA_MODE;
+else process.env.SURAKSHYA_MODE = previousMode;
 
 test('read-only deployment serves research data and rejects persistent writes', async t => {
   const server = app.listen(0, '127.0.0.1');
@@ -35,6 +39,10 @@ test('read-only deployment serves research data and rejects persistent writes', 
   const healthResponse = await fetch(`${base}/health`);
   const health = await healthResponse.json();
   assert.equal(healthResponse.status, 200);
+  assert.equal(health.operatingMode, 'public-read-only');
+  assert.equal(health.mutationPolicy, 'disabled');
+  assert.equal(health.storage.configured, false);
+  assert.equal(health.storage.readable, false);
   assert.equal(health.storage.mode, 'read-only');
   assert.equal(health.storage.writable, false);
 
@@ -66,7 +74,7 @@ test('read-only deployment serves research data and rejects persistent writes', 
     });
     const result = await response.json();
     assert.equal(response.status, 503, `${endpoint} should be unavailable without persistent storage`);
-    assert.match(result.error, /Persistent storage is not configured/);
+    assert.match(result.error, /read-only|disabled/);
   }
 
   const oversized = await fetch(`${base}/dataset/import`, {
