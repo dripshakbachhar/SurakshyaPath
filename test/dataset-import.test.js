@@ -17,6 +17,11 @@ test('CSV import parser handles quoted commas, escaped quotes, and embedded newl
   assert.equal(parsed.records[1].note, 'Two\nlines');
 });
 
+test('CSV import rejects malformed quote boundaries', () => {
+  assert.throws(() => parseCsv('zone,category\n"North"x,Theft'), /characters after a quoted field/);
+  assert.throws(() => parseCsv('zone,category\nNorth",Theft'), /quote in an unquoted field/);
+});
+
 test('JSON import accepts record arrays and object-wrapped records', () => {
   assert.deepEqual(parseJson('{"records":[{"area":"A"},{"area":"B"}]}').headers, ['area']);
   assert.throws(() => parseJson('{"items":[]}'), /records array/);
