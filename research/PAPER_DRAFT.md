@@ -77,6 +77,7 @@ Each incident contributes:
 severity × max(0.15, 1 − ageDays / 30)
 
 The zone score is the sum of incident contributions within the 30-day model window.
+For the synthetic benchmark, `ageDays` is an integer simulation input; it does not encode an observed event time or event hour. All runtime date bounds and temporal charts use UTC, and hourly metrics require exact, non-synthetic timestamps.
 
 All models are normalized so that the highest-scoring zone has a score of 100.
 

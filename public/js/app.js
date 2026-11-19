@@ -8,6 +8,7 @@ const TYPE_META={
   infrastructure:{label:'Infrastructure Issue',icon:'⚠️',color:'#38bdf8'}
 };
 const BAND_COLOR={low:'#22c55e',moderate:'#eab308',high:'#f97316',critical:'#ef4444'};
+const Temporal=window.SurakshyaTemporal;
 const state={reports:[],zones:[],types:{},analytics:null,stats:null,intelligence:null,dataQuality:null,dataset:null,datasetKey:null,importDraft:null,datasetResearch:null,pick:null,tab:'overview',loading:false,mobileMapVisible:false};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -20,7 +21,26 @@ function syncTypeMetadata(){
   });
 }
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
-const timeAgo=ts=>{const h=Math.floor((Date.now()-Number(ts))/3600000);return h<1?'just now':h<24?h+'h ago':Math.floor(h/24)+'d ago';};
+const timeAgo=ts=>{const h=Math.floor(Math.max(0,Date.now()-Number(ts))/3600000);return h<1?'less than 1h ago':h<24?h+'h ago':Math.floor(h/24)+'d ago';};
+function eventTimeLabel(record){
+  const time=Temporal.resolveTime(record);
+  if(time.precision==='instant'){
+    const utc=new Date(time.start).toISOString().replace('T',' ').slice(0,16)+' UTC';
+    return `${timeAgo(time.start)} · ${utc}`;
+  }
+  if(time.precision==='date'){
+    const date=new Date(time.start).toISOString().slice(0,10);
+    return time.origin==='synthetic'?`Simulation date · ${date} UTC`:`Date only · ${date} UTC`;
+  }
+  if(time.precision==='range'){
+    const labels={now:'past hour',today:'today (UTC)',week:'past 7 days',month:'past 30 days'};
+    return `Approx. ${labels[time.window]||'time range'}`;
+  }
+  return 'Event time unknown';
+}
+function recentCountLabel(zone){
+  return zone.last24h===null?'24h count unavailable':`${zone.last24h} records · 24h`;
+}
 let lastSuccessfulRefresh=null,detailReturnFocus=null;
 function toast(message,ok=true){const t=$('#toast');if(!t)return;t.textContent=message;t.className='toast show '+(ok?'ok':'err');clearTimeout(t._timer);t._timer=setTimeout(()=>t.className='toast',3200);}
 async function getJSON(url,options={}){const res=await fetch(url,{headers:{Accept:'application/json',...(options.headers||{})},...options});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||`Request failed (${res.status})`);return data;}
@@ -52,14 +72,26 @@ function showPickedSpot(){const el=$('#picked-spot');if(!el||!state.pick)return;
 function useMyLocation(){if(!navigator.geolocation)return toast('Geolocation is not available.',false);navigator.geolocation.getCurrentPosition(pos=>{state.pick={lat:+pos.coords.latitude.toFixed(5),lng:+pos.coords.longitude.toFixed(5)};showPickedSpot();toast('Location pinned from GPS.');},()=>toast('Could not read GPS. Click the map instead.',false),{enableHighAccuracy:false,timeout:7000});}
 
 function drawZones(){layers.zones.clearLayers();state.zones.forEach(z=>{const color=BAND_COLOR[z.band]||BAND_COLOR.low;L.circle([z.lat,z.lng],{radius:350+Number(z.score||0)*12,color,weight:2,fillColor:color,fillOpacity:.12,dashArray:'5 5'}).bindTooltip(`<b>${esc(z.name)}</b><br><span>${z.score}/100 · ${esc(z.band)}</span>`,{direction:'top',className:'zone-label'}).on('click',()=>openZoneDetail(z)).addTo(layers.zones);});}
-function drawMarkers(){layers.markers.clearLayers();state.reports.slice(-120).forEach(r=>{const m=TYPE_META[r.type]||{label:state.types[r.type]?.label||r.type,icon:'•',color:'#94a3b8'};L.circleMarker([r.lat,r.lng],{radius:4.5,color:'#17384b',weight:1,fillColor:m.color,fillOpacity:.82}).bindTooltip(`${m.icon} ${esc(m.label)} · ${timeAgo(r.ts)}`).on('click',()=>openReportDetail(r)).addTo(layers.markers);});}
+function drawMarkers(){layers.markers.clearLayers();state.reports.slice(-120).forEach(r=>{const m=TYPE_META[r.type]||{label:state.types[r.type]?.label||r.type,icon:'•',color:'#94a3b8'};L.circleMarker([r.lat,r.lng],{radius:4.5,color:'#17384b',weight:1,fillColor:m.color,fillOpacity:.82}).bindTooltip(`${m.icon} ${esc(m.label)} · ${esc(eventTimeLabel(r))}`).on('click',()=>openReportDetail(r)).addTo(layers.markers);});}
 function drawHeat(){layers.heat.clearLayers();const mapEl=$('#map');if(!mapEl.clientWidth||!mapEl.clientHeight)return;const strengths=state.reports.map(r=>Number(state.types[r.type]?.useRecordSeverity?r.severity:state.types[r.type]?.severity)||0),max=Math.max(...strengths,1);const points=state.reports.map((r,i)=>[r.lat,r.lng,strengths[i]/max]);if(points.length)L.heatLayer(points,{radius:22,blur:24,max:8,maxZoom:15,minOpacity:.12,gradient:{.2:'#477bb1',.4:'#328b87',.6:'#75a77b',.8:'#d69a4c',1:'#c95648'}}).addTo(layers.heat);}
-function renderMapZones(){const el=$('#map-zone-list');if(!el)return;const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,5);el.innerHTML=zones.map((z,i)=>`<button class="map-zone-row" data-zone="${esc(z.id)}"><span class="rank">${i+1}</span><span><b>${esc(z.name)}</b><small>${z.count} reports · ${z.last24h} today</small></span><strong style="color:${BAND_COLOR[z.band]}">${z.score}</strong></button>`).join('');el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
+function renderMapZones(){const el=$('#map-zone-list');if(!el)return;const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,5);el.innerHTML=zones.map((z,i)=>`<button class="map-zone-row" data-zone="${esc(z.id)}"><span class="rank">${i+1}</span><span><b>${esc(z.name)}</b><small>${z.count} records · ${esc(recentCountLabel(z))}</small></span><strong style="color:${BAND_COLOR[z.band]}">${z.score}</strong></button>`).join('');el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
 function focusZone(id){const z=state.zones.find(x=>x.id===id);if(!z)return;const mapEl=$('#map');if(!mapEl.clientWidth||!mapEl.clientHeight){setMobileMapVisible(true);requestAnimationFrame(()=>requestAnimationFrame(()=>focusZone(id)));return;}map.flyTo([z.lat,z.lng],14,{duration:.6});openZoneDetail(z);}
 $('#map-reset').onclick=()=>map.setView(defaultView.center,defaultView.zoom,{duration:.5});
 
-function openZoneDetail(z){$('#detail-title').textContent=z.name;$('#detail-subtitle').textContent=`${String(z.band).toUpperCase()} RISK · LIVE DASHBOARD SNAPSHOT`;$('#detail-body').innerHTML=`<div class="detail-grid"><div><span>Risk score</span><b style="color:${BAND_COLOR[z.band]}">${z.score}/100</b></div><div><span>Reports · 30d</span><b>${z.count}</b></div><div><span>Last 24h</span><b>${z.last24h}</b></div><div><span>Peak hour</span><b>${z.peakHour===null?'—':String(z.peakHour).padStart(2,'0')+':00'}</b></div></div><div class="detail-section"><h3>About this score</h3><p>This score comes from the live severity × recency model and the current dashboard reports. It is for exploration, not a forecast or operational recommendation.</p></div><button class="btn secondary" id="detail-focus">Focus this zone on map</button>`;openDetail();$('#detail-focus').onclick=()=>{map.flyTo([z.lat,z.lng],14,{duration:.6});closeDetail();};}
-function openReportDetail(r){const m=TYPE_META[r.type]||{label:typeLabel(r.type),icon:'•'};const z=state.zones.find(x=>x.id===r.zone);$('#detail-title').textContent=m.label;$('#detail-subtitle').textContent=`INCIDENT · ${timeAgo(r.ts)}`;$('#detail-body').innerHTML=`<div class="detail-grid"><div><span>Zone</span><b>${esc(z?.name||r.zone)}</b></div><div><span>Type</span><b>${esc(m.label)}</b></div><div><span>Latitude</span><b>${Number(r.lat).toFixed(5)}</b></div><div><span>Longitude</span><b>${Number(r.lng).toFixed(5)}</b></div></div><div class="detail-section"><h3>Report text</h3><p>${esc(r.note||'No description provided.')}</p></div>`;openDetail();}
+function openZoneDetail(z){
+  const peak=z.peakHour===null?'Unavailable':`${String(z.peakHour).padStart(2,'0')}:00 UTC`;
+  const excluded=(z.temporalCoverage?.ambiguous||0)+(z.temporalCoverage?.unknown||0);
+  const recent=z.last24hCoverage||{};
+  const recentNote=z.last24h===null
+    ? `The 24-hour count is unavailable: ${recent.unknown||0} records have unknown time and ${recent.ambiguous||0} overlap the window boundary.`
+    : 'The count uses time ranges wholly within the last 24 hours (UTC).';
+  $('#detail-title').textContent=z.name;
+  $('#detail-subtitle').textContent=`${String(z.band).toUpperCase()} RISK · LIVE DASHBOARD SNAPSHOT`;
+  $('#detail-body').innerHTML=`<div class="detail-grid"><div><span>Risk score</span><b style="color:${BAND_COLOR[z.band]}">${z.score}/100</b></div><div><span>Records · 30d</span><b>${z.count}</b></div><div><span>Records · last 24h</span><b>${z.last24h===null?'Unavailable':z.last24h}</b></div><div><span>Peak event hour</span><b>${peak}</b></div></div><p class="muted small">${esc(recentNote)}${z.peakHour===null?' Hourly analysis requires exact, non-synthetic timestamps.':''}${excluded?` ${excluded} records were excluded from the 30-day score because their time was unknown or boundary-ambiguous.`:''}</p><div class="detail-section"><h3>About this score</h3><p>This score comes from the severity × recency model and the current dashboard records. It is for exploration, not a forecast or operational recommendation.</p></div><button class="btn secondary" id="detail-focus">Focus this zone on map</button>`;
+  openDetail();
+  $('#detail-focus').onclick=()=>{map.flyTo([z.lat,z.lng],14,{duration:.6});closeDetail();};
+}
+function openReportDetail(r){const m=TYPE_META[r.type]||{label:typeLabel(r.type),icon:'•'};const z=state.zones.find(x=>x.id===r.zone);$('#detail-title').textContent=m.label;$('#detail-subtitle').textContent=`RECORD · ${eventTimeLabel(r)}`;$('#detail-body').innerHTML=`<div class="detail-grid"><div><span>Zone</span><b>${esc(z?.name||r.zone)}</b></div><div><span>Type</span><b>${esc(m.label)}</b></div><div><span>Latitude</span><b>${Number(r.lat).toFixed(5)}</b></div><div><span>Longitude</span><b>${Number(r.lng).toFixed(5)}</b></div></div><div class="detail-section"><h3>Report text</h3><p>${esc(r.note||'No description provided.')}</p></div>`;openDetail();}
 function openAnalyticsDetail(title,html){$('#detail-title').textContent=title;$('#detail-subtitle').textContent='ANALYTICS DETAIL';$('#detail-body').innerHTML=html;openDetail();}
 function openDetail(){const d=$('#detail');detailReturnFocus=document.activeElement;d.classList.add('open');d.setAttribute('aria-hidden','false');$('#detail-close').focus();}
 function closeDetail(){const d=$('#detail');d.classList.remove('open');d.setAttribute('aria-hidden','true');if(detailReturnFocus?.isConnected)detailReturnFocus.focus();detailReturnFocus=null;}
@@ -77,9 +109,9 @@ $('#detail-close').onclick=closeDetail;$('#detail-backdrop').onclick=closeDetail
 });
 
 function renderTypeChart(values){const root=$('#chart-type');if(!root)return;const entries=Object.entries(values||{}).filter(([,v])=>Number(v)>0),total=entries.reduce((s,[,v])=>s+Number(v),0)||1;let cursor=0;const segments=entries.map(([type,v])=>{const share=Number(v)/total,dash=share*100,offset=-(cursor/total*100);cursor+=Number(v);return{type,value:Number(v),dash,offset};});const circles=segments.map(s=>`<circle class="donut-ring" data-type="${esc(s.type)}" cx="70" cy="70" r="50" pathLength="100" stroke="${TYPE_META[s.type]?.color||'#64748b'}" stroke-width="18" stroke-dasharray="${s.dash} ${100-s.dash}" stroke-dashoffset="${s.offset}" aria-label="${esc(TYPE_META[s.type]?.label||s.type)}: ${s.value}" tabindex="0"></circle>`).join('');root.innerHTML=`<div class="donut-wrap"><div class="donut-svg"><svg viewBox="0 0 140 140" role="img" aria-label="Incidents by type">${circles}</svg><div class="donut-hole"><b>${total}</b><span>reports</span></div></div><div class="chart-legend">${segments.map(s=>`<button data-type="${esc(s.type)}"><i style="background:${TYPE_META[s.type]?.color||'#64748b'}"></i><span>${esc(TYPE_META[s.type]?.label||s.type)}</span><b>${s.value}</b></button>`).join('')}</div></div>`;const openType=type=>{const n=Number(values[type]||0);openAnalyticsDetail(TYPE_META[type]?.label||type,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>Share of dashboard records: ${(n/total*100).toFixed(1)}%.</p>`);};root.querySelectorAll('[data-type]').forEach(b=>{b.onclick=()=>openType(b.dataset.type);b.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')openType(b.dataset.type);};});}
-function renderHourChart(values){const root=$('#chart-hour');if(!root)return;const max=Math.max(...values.map(Number),1);root.innerHTML=`<div class="bar-chart">${values.map((v,h)=>`<button class="bar" data-hour="${h}" title="${h}:00 · ${v} records"><span style="height:${Math.max(3,Number(v)/max*100)}%;background:${h>=20||h<4?'#ef4444':'#3b82f6'}"></span><small>${h%3===0?h:''}</small></button>`).join('')}</div>`;root.querySelectorAll('[data-hour]').forEach(b=>b.onclick=()=>{const h=Number(b.dataset.hour),n=Number(values[h]||0);openAnalyticsDetail(`Hour ${String(h).padStart(2,'0')}:00`,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>${h>=20||h<4?'This hour falls inside the dashboard night window (20:00–04:00).':'This hour falls outside the dashboard night window.'}</p>`);});}
-function renderTrendChart(values){const root=$('#chart-trend');if(!root)return;const nums=values.map(d=>Number(d.count)||0),max=Math.max(...nums,1);root.innerHTML=`<div class="trend-chart">${values.map((d,i)=>`<button class="trend-point" data-index="${i}" style="left:${nums.length===1?50:i/(nums.length-1)*100}%;bottom:${nums[i]/max*82+8}%"><span></span></button>`).join('')}<div class="trend-line"></div><div class="axis"><span>older</span><span>today</span></div></div>`;root.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{const d=values[Number(b.dataset.index)];openAnalyticsDetail(`Day ${d.day} of 30`,`<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p>Daily count in the rolling 30-day dashboard snapshot.</p>`);});}
-function drawCharts(a){if(a){renderTypeChart(a.byType);renderHourChart(a.byHour);renderTrendChart(a.byDay);}}
+function renderHourChart(values,coverage){const root=$('#chart-hour');if(!root)return;const excluded=coverage?.hourlyExcludedRecords??0;const exclusions=Object.entries(coverage?.hourlyExcludedByPrecision||{}).map(([kind,count])=>`${count} ${kind.replace(':',' ')}`).join(', ');if(!Array.isArray(values)){root.innerHTML=`<p class="muted">Unavailable — no exact, non-synthetic event timestamps support an hour-of-day analysis. ${excluded} records excluded${exclusions?`: ${esc(exclusions)}`:''}.</p>`;return;}const max=Math.max(...values.map(Number),1);root.innerHTML=`<div class="bar-chart">${values.map((v,h)=>`<button class="bar" data-hour="${h}" title="${String(h).padStart(2,'0')}:00 UTC · ${v} records"><span style="height:${Math.max(3,Number(v)/max*100)}%;background:${h>=20||h<4?'#ef4444':'#3b82f6'}"></span><small>${h%3===0?h:''}</small></button>`).join('')}</div><p class="muted small">${coverage?.hourlyEligibleRecords??0} exact-time records shown; ${excluded} records excluded from hourly analysis${exclusions?` (${esc(exclusions)})`:''}.</p>`;root.querySelectorAll('[data-hour]').forEach(b=>b.onclick=()=>{const h=Number(b.dataset.hour),n=Number(values[h]||0);openAnalyticsDetail(`Hour ${String(h).padStart(2,'0')} UTC`,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>${h>=20||h<4?'This hour falls inside the dashboard night window (20:00–04:00 UTC).':'This hour falls outside the dashboard night window.'}</p>`);});}
+function renderTrendChart(values,coverage){const root=$('#chart-trend');if(!root)return;const nums=values.map(d=>Number(d.count)||0),max=Math.max(...nums,1);root.innerHTML=`<div class="trend-chart">${values.map((d,i)=>`<button class="trend-point" data-index="${i}" title="${esc(d.date)} UTC · ${d.count} records" style="left:${nums.length===1?50:i/(nums.length-1)*100}%;bottom:${nums[i]/max*82+8}%"><span></span></button>`).join('')}<div class="trend-line"></div><div class="axis"><span>${esc(values[0]?.date||'')}</span><span>today · UTC</span></div></div>${coverage?.dailyExcludedRecords?`<p class="muted small">${coverage.dailyExcludedRecords} records with missing, unknown, or multi-day timing were excluded from daily bins.</p>`:''}`;root.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{const d=values[Number(b.dataset.index)];openAnalyticsDetail(`${d.date} UTC`,`<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p>Records assigned to this UTC calendar date. Unknown or multi-day time ranges are not assigned to a single date.</p>`);});}
+function drawCharts(a){if(a){renderTypeChart(a.byType);renderHourChart(a.byHour,a.temporalCoverage);renderTrendChart(a.byDay,a.temporalCoverage);}}
 
 function renderIntelligence(){
   const i=state.intelligence;
@@ -96,7 +128,9 @@ function renderIntelligence(){
   $('#intelligence-patterns').innerHTML=(i.patterns||[]).map(p=>`<div class="intel-row">• ${esc(p)}</div>`).join('')||'<div class="intel-row muted">No validated pattern available.</div>';
   $('#intelligence-recommendations').innerHTML=(i.recommendations||[]).map(r=>`<div class="intel-row"><b>${esc(r.zone||'System')}</b><span>${esc(r.reason)}</span></div>`).join('')||'<div class="intel-row muted">No recommendation is supported by the current evidence.</div>';
   const q=state.dataQuality||{};
-  $('#intelligence-evidence').innerHTML=`<div class="intel-evidence-grid"><span>Received <b>${q.recordsReceived??0}</b></span><span>Accepted <b>${q.recordsAccepted??0}</b></span><span>Rejected <b>${q.recordsRejected??0}</b></span><span>Quality <b>${Math.round((q.qualityScore||0)*100)}%</b></span></div><p>${(i.limitations||[]).map(esc).join(' ')}</p>`;
+  const precision=Object.entries(q.temporalCoverage?.precisionByOrigin||{}).map(([kind,count])=>`${count} ${kind.replace(':',' ')}`).join(', ')||'not available';
+  const rejectionReasons=[...new Set((q.rejectedSamples||[]).flatMap(sample=>sample.reasons||[]))];
+  $('#intelligence-evidence').innerHTML=`<div class="intel-evidence-grid"><span>Received <b>${q.recordsReceived??0}</b></span><span>Accepted <b>${q.recordsAccepted??0}</b></span><span>Rejected <b>${q.recordsRejected??0}</b></span><span>Quality <b>${Math.round((q.qualityScore||0)*100)}%</b></span></div><p>Timestamp precision: ${esc(precision)}. Exact-hour eligible: ${q.temporalCoverage?.eventHourEligibleRecords??0}. Event-time metrics use UTC.</p>${rejectionReasons.length?`<p>Rejection reasons (sample): ${rejectionReasons.map(esc).join('; ')}.</p>`:''}<p>${(i.limitations||[]).map(esc).join(' ')}</p>`;
 }
 function renderResearchSummary(summary){
   const labels={
@@ -161,14 +195,14 @@ async function refreshData(){
     $('#connection').textContent='Online';$('#connection').className='connection live';
     lastSuccessfulRefresh=new Date();
     const updated=$('#data-updated');
-    updated.textContent=`Updated ${lastSuccessfulRefresh.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`;
-    updated.title=`Dashboard data updated ${lastSuccessfulRefresh.toLocaleString()}`;
+    updated.textContent=`Updated ${lastSuccessfulRefresh.toLocaleTimeString('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})} UTC`;
+    updated.title=`Dashboard data updated ${lastSuccessfulRefresh.toLocaleString('en-GB',{timeZone:'UTC'})} UTC`;
     $('#overview-updated').textContent=updated.textContent;
   }catch(err){
     $('#connection').textContent='Offline';$('#connection').className='connection offline';
     const updated=$('#data-updated');
-    updated.textContent=lastSuccessfulRefresh?`Stale · updated ${lastSuccessfulRefresh.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}`:'No data loaded';
-    updated.title=lastSuccessfulRefresh?`Last successful update ${lastSuccessfulRefresh.toLocaleString()}`:'The dashboard has not loaded data yet.';
+    updated.textContent=lastSuccessfulRefresh?`Stale · updated ${lastSuccessfulRefresh.toLocaleTimeString('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})} UTC`:'No data loaded';
+    updated.title=lastSuccessfulRefresh?`Last successful update ${lastSuccessfulRefresh.toLocaleString('en-GB',{timeZone:'UTC'})} UTC`:'The dashboard has not loaded data yet.';
     toast(err.message||'Could not load dashboard.',false);
   }
   finally{state.loading=false;}
@@ -219,13 +253,14 @@ function renderDatasetResearch(result){
     'frequency-severity':'Frequency × severity',
     'current-severity-recency':'Severity × recency'
   };
-  $('#dataset-research-results').innerHTML=result.rows.map(row=>`<tr><th scope="row">${esc(labels[row.model]||row.model)}</th><td>${esc(row.topZone)}</td><td>${row.zonesReRanked} / ${row.zoneCount}</td><td>${row.allocationChanges} / ${row.zoneCount}</td><td>${Number(row.nearestNeighbourKm).toFixed(2)}</td><td>${Number(row.twoOptKm).toFixed(2)}</td></tr>`).join('');
-  $('#dataset-research-summary').textContent=`Computed from ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories. These results do not replace or modify the canonical synthetic experiment.`;
+  $('#dataset-research-results').innerHTML=result.rows.map(row=>{const available=row.availability!=='UNAVAILABLE';const label=`${labels[row.model]||row.model}${row.availability==='PARTIAL'?' · partial':''}`;return `<tr><th scope="row">${esc(label)}</th><td>${available?esc(row.topZone):'Unavailable'}</td><td>${available?`${row.zonesReRanked} / ${row.zoneCount}`:'—'}</td><td>${available?`${row.allocationChanges} / ${row.zoneCount}`:'—'}</td><td>${available?`${Number(row.nearestNeighbourKm).toFixed(2)} km`:'—'}</td><td>${available?`${Number(row.twoOptKm).toFixed(2)} km`:'—'}</td></tr>`;}).join('');
+  const coverage=result.dataset.temporalCoverage;
+  $('#dataset-research-summary').textContent=`Computed from ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories. The severity × recency model used ${coverage.recencyEligibleRecords} records; ${coverage.recencyExcludedRecords} with unknown or future timing were excluded. These results do not replace or modify the canonical synthetic experiment.`;
   $('#dataset-research-summary').hidden=false;
   $('#dataset-research-methods').textContent=`${result.methods.scoring} ${result.methods.allocation} ${result.methods.routing} ${result.methods.robustness}`;
   $('#dataset-research-methods').classList.remove('hidden');
   $('#dataset-research-table-wrap').classList.remove('hidden');
-  $('#dataset-research-status').textContent=`Dataset comparison complete · ${new Date(result.dataset.importedAt).toLocaleString()}`;
+  $('#dataset-research-status').textContent=`Dataset comparison complete · ${new Date(result.dataset.importedAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC`;
   $('#dataset-research-status').className='research-results-status';
   state.datasetResearch=result;
 }
@@ -370,9 +405,12 @@ function updateStats(){
   $('#stat-total').textContent=stats.total??state.reports.length;
   $('#stat-zones').textContent=stats.activeZones??state.zones.filter(zone=>zone.count>0).length;
   $('#stat-critical').textContent=stats.highRiskZones??state.zones.filter(zone=>zone.band==='high'||zone.band==='critical').length;
-  $('#stat-recent').textContent=state.analytics?.last24h??0;
+  const recent=state.analytics?.last24h;
+  $('#stat-recent').textContent=recent===null||recent===undefined?'—':recent;
+  const recentCoverage=state.analytics?.temporalCoverage?.windows?.last24h;
+  $('#stat-recent').title=recent===null||recent===undefined?`Unavailable: ${recentCoverage?.unknown??0} unknown and ${recentCoverage?.ambiguous??0} boundary-ambiguous records affect the last-24-hour window.`:'Count of records whose supported time interval is wholly within the last 24 hours (UTC).';
 }
-function renderZoneList(){const el=$('#zone-list');if(!el)return;const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score));el.innerHTML=zones.map(z=>`<li><button class="zone-item" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} reports · ${z.last24h} today · peak ${z.peakHour===null?'—':String(z.peakHour).padStart(2,'0')+':00'}</small></span><strong class="badge ${esc(z.band)}">${z.score}</strong></button></li>`).join('');el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
+function renderZoneList(){const el=$('#zone-list');if(!el)return;const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score));el.innerHTML=zones.map(z=>`<li><button class="zone-item" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} records · ${esc(recentCountLabel(z))} · peak ${z.peakHour===null?'unavailable':String(z.peakHour).padStart(2,'0')+':00 UTC'}</small></span><strong class="badge ${esc(z.band)}">${z.score}</strong></button></li>`).join('');el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
 function setTab(tab){state.tab=tab;$$('.tab').forEach(b=>{const selected=b.dataset.tab===tab;b.classList.toggle('active',selected);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});$$('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${tab}`));const researchView=tab==='research';$('.workspace').classList.toggle('research-mode',researchView);document.body.classList.toggle('research-view',researchView);setMobileMapVisible(false);$('#panel').scrollTop=0;invalidateMapSize();if(tab==='analytics'&&state.analytics)requestAnimationFrame(()=>drawCharts(state.analytics));$('#map-mode').textContent=tab==='report'?'Click anywhere on the map to pin a report.':'Select a zone or report marker for details.';}
 $('#tabs').onclick=e=>{const button=e.target.closest('.tab');if(button)setTab(button.dataset.tab);};
 $('#tabs').onkeydown=e=>{
@@ -423,7 +461,7 @@ function drawRoute(route,alloc,announce=true){
   route.stops.forEach((s,i)=>L.marker([s.lat,s.lng],{icon:L.divIcon({className:'stop-pin',html:`<b>${i+1}</b>`,iconSize:[26,26]})}).on('click',()=>openAnalyticsDetail(`Patrol stop ${i+1}: ${s.name}`,`<div class="detail-grid"><div><span>Risk</span><b>${s.score}/100</b></div><div><span>Band</span><b>${esc(s.band)}</b></div><div><span>Leg</span><b>${s.legKm} km</b></div><div><span>Zone</span><b>${esc(s.name)}</b></div></div>`)).addTo(layers.route));
   map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])).pad(.25));$('#route-card').classList.remove('hidden');
   $('#route-card').innerHTML=`<div class="result-heading"><h3>🚔 Route from ${esc(route.station.name)}</h3><button class="ghost-btn" id="route-focus">Focus route</button></div><ol>${route.stops.map((s,i)=>`<li><button class="route-stop" data-stop="${i}"><b>${esc(s.name)}</b><span>risk ${s.score} · +${s.legKm} km</span></button></li>`).join('')}</ol><div class="route-meta">📏 ${route.totalKm} km · ⏱ ~${route.totalMin} min including stops</div>`;
-  $('#alloc-card').classList.remove('hidden');$('#alloc-card').innerHTML=`<div class="result-heading"><h3>👮 Officer allocation</h3><span class="result-pill">${alloc.officers} on duty</span></div><div class="allocation-list">${alloc.zones.map(z=>`<button class="allocation-row" data-zone="${esc(z.id||z.name)}"><span><b>${esc(z.name)}</b><small>${esc(z.window)}</small></span><strong>${z.officers}</strong></button>`).join('')}</div><p class="muted small">Allocation is proportional to the current risk score and uses the same zone model as the map.</p>`;
+  $('#alloc-card').classList.remove('hidden');$('#alloc-card').innerHTML=`<div class="result-heading"><h3>👮 Officer allocation</h3><span class="result-pill">${alloc.officers} on duty</span></div><div class="allocation-list">${alloc.zones.map(z=>`<button class="allocation-row" data-zone="${esc(z.id||z.name)}"><span><b>${esc(z.name)}</b><small>${z.window?esc(z.window):'Time window unavailable: no exact event hour'}</small></span><strong>${z.officers}</strong></button>`).join('')}</div><p class="muted small">Allocation is proportional to the current risk score. Time windows are shown only when supported by exact, non-synthetic event timestamps.</p>`;
   $('#route-focus').onclick=()=>map.fitBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])).pad(.25));
   $('#route-card').querySelectorAll('[data-stop]').forEach(b=>b.onclick=()=>map.flyTo([route.stops[Number(b.dataset.stop)].lat,route.stops[Number(b.dataset.stop)].lng],14,{duration:.5}));
   $('#alloc-card').querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>{const z=state.zones.find(x=>x.id===b.dataset.zone||x.name===b.dataset.zone);if(z)openZoneDetail(z);});

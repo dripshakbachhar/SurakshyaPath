@@ -97,6 +97,8 @@ For each incident:
 
 The zone score is the sum of incident contributions.
 
+For the fixed synthetic benchmark, `ageDays` is an integer simulation input, not a timestamp-derived observation. The runtime compatibility timestamp is anchored to a UTC date and must not be interpreted as an observed event hour. The recency model uses day-level age; it does not support hourly claims.
+
 Each model is normalized so that the highest-scoring zone has a normalized score of 100.
 
 Implementation: `algorithms/research-models.js`

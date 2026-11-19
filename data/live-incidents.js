@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { ZONES } = require('../config/zones');
+const Temporal = require('../public/js/temporal');
 
 const DAY_MS = 86400000;
 const CSV_FILE = path.join(__dirname, 'synthetic_incidents.csv');
@@ -48,12 +49,14 @@ function loadSyntheticIncidents(now = Date.now()) {
       throw new Error(`Invalid synthetic incident record: ${row.id || 'unknown'}`);
     }
 
+    const ts = Temporal.utcDayStart(snapshotNow) - ageDays * DAY_MS;
     return {
       id: row.id,
       zone: zone.id,
       type: row.category,
       severity: Number(row.severity),
-      ts: snapshotNow - ageDays * DAY_MS,
+      ts,
+      time: Temporal.dateTime(ts, snapshotNow, 'synthetic'),
       reporter: 'Synthetic simulation',
       note: `Synthetic research record (${row.category}).`,
       lat: Number(lat.toFixed(5)),

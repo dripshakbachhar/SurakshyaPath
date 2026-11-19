@@ -46,7 +46,7 @@
     <button class="stat stat-click" data-stat="total"><span id="stat-total" class="num">—</span><span><b>Records</b><small>current dashboard</small></span></button>
     <button class="stat stat-click" data-stat="zones"><span id="stat-zones" class="num">—</span><span><b>Active zones</b><small>with reports</small></span></button>
     <button class="stat stat-click" data-stat="critical"><span id="stat-critical" class="num">—</span><span><b>High-risk zones</b><small>current risk model</small></span></button>
-    <button class="stat stat-click" data-stat="recent"><span id="stat-recent" class="num">—</span><span><b>Last 24 hours</b><small>recent reports</small></span></button>
+    <button class="stat stat-click" data-stat="recent"><span id="stat-recent" class="num">—</span><span><b>Last 24 hours · UTC</b><small>records with supported timing</small></span></button>
   </section>
 
   <div class="view-toggle-row">
@@ -108,7 +108,7 @@
         <p class="muted">Import a CSV or JSON incident dataset for dashboard analysis. Files are processed and stored by this app; they are not sent to an external analysis service.</p>
         <div id="dataset-current" class="active-dataset-card" role="status">Loading current dataset…</div>
         <div class="section-title">Import a dataset</div>
-        <p class="dataset-help">Each row must include a zone, category, latitude, longitude and date/time. Severity is optional; when omitted, it defaults to 1. Coordinates must be valid latitude/longitude values.</p>
+        <p class="dataset-help">Each row must include a zone, category, valid latitude/longitude coordinates and date/time. ISO date-only values (YYYY-MM-DD) stay date-only; ISO date-times with an offset are exact. A date-time without an offset is interpreted as UTC. Severity is optional; when omitted, it defaults to 1.</p>
         <form id="dataset-form">
           <label for="dataset-name">Dataset name</label>
           <input id="dataset-name" type="text" maxlength="80" required placeholder="e.g. Community safety observations" />
@@ -148,10 +148,12 @@
           </select>
           <label for="f-when">When?</label>
           <select id="f-when">
-            <option value="now">Just now</option>
-            <option value="today">Earlier today</option>
-            <option value="week">Within the past week</option>
+            <option value="now">Approximately within the past hour</option>
+            <option value="today">Earlier today (UTC calendar day)</option>
+            <option value="week">Within the past 7 days (rolling)</option>
+            <option value="month">Within the past 30 days (rolling)</option>
           </select>
+          <p class="dataset-help">This is an approximate time window, not an exact event timestamp. “Today” follows the UTC calendar day.</p>
           <label for="f-note">Details <span>(optional)</span></label>
           <textarea id="f-note" maxlength="280" rows="4" placeholder="Short factual description…"></textarea>
           <button type="submit" class="btn primary">Submit anonymous report</button>
@@ -230,10 +232,10 @@
 
       <section id="panel-analytics" class="panel" role="tabpanel" aria-labelledby="tab-analytics">
         <div class="panel-heading"><div><span class="eyebrow">Exploratory view</span><h2>Time patterns</h2></div></div>
-        <p class="muted">These charts describe the current dashboard snapshot and are not part of the four-model experiment. Select a chart element to inspect its value.</p>
+        <p class="muted">These charts describe the current dashboard snapshot in UTC and are not part of the four-model experiment. Synthetic and date-only records support day-level analysis only; unsupported metrics are shown as unavailable.</p>
         <div class="chart-box"><div class="chart-title"><h3>Incidents by type</h3><span>Click a segment</span></div><div id="chart-type" class="chart" role="img" aria-label="Incidents by type"></div></div>
-        <div class="chart-box"><div class="chart-title"><h3>Hour of day</h3><span>Click a bar</span></div><div id="chart-hour" class="chart" role="img" aria-label="Incidents by hour"></div></div>
-        <div class="chart-box"><div class="chart-title"><h3>Last 30 days</h3><span>Click a day</span></div><div id="chart-trend" class="chart" role="img" aria-label="Incidents over the last 30 days"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Event hour (exact timestamps only)</h3><span>UTC</span></div><div id="chart-hour" class="chart" role="img" aria-label="Exact event timestamps by UTC hour"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Daily records (UTC)</h3><span>Last 30 calendar days · click a day</span></div><div id="chart-trend" class="chart" role="img" aria-label="Daily records over the last 30 UTC calendar days"></div></div>
       </section>
     </aside>
   </main>
@@ -252,6 +254,7 @@
   <footer>SurakshyaPath · local dataset workspace · fixed synthetic research benchmark · research prototype</footer>
   <div id="toast" class="toast" aria-live="polite"></div>
   <script src="js/cursor.js"></script>
+  <script src="js/temporal.js"></script>
   <script src="js/dataset-import.js"></script>
   <script src="js/app.js"></script>
 </body>

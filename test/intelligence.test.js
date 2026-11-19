@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const { ZONES } = require('../config/zones');
 const { INCIDENT_TYPES } = require('../config/incident-types');
 const { buildDataQuality, buildIntelligence } = require('../algorithms/intelligence');
+const Temporal = require('../public/js/temporal');
 
 const NOW = Date.UTC(2026, 8, 30, 12);
 
@@ -17,10 +18,10 @@ test('intelligence reports no data instead of returning an empty object', () => 
 
 test('intelligence consumes the same validated incident snapshot as risk analytics', () => {
   const incidents = [
-    { id: 'a', zone: 'thamel', type: 'theft', ts: NOW - 3600000, lat: 27.715, lng: 85.312 },
-    { id: 'b', zone: 'thamel', type: 'harassment', ts: NOW - 2 * 3600000, lat: 27.716, lng: 85.313 },
-    { id: 'c', zone: 'patan', type: 'infrastructure', ts: NOW - 3 * 86400000, lat: 27.673, lng: 85.324 },
-    { id: 'future', zone: 'patan', type: 'theft', ts: NOW + 86400000, lat: 27.673, lng: 85.324 }
+    { id: 'a', zone: 'thamel', type: 'theft', ts: NOW - 3600000, time: Temporal.exactTime(NOW - 3600000), lat: 27.715, lng: 85.312 },
+    { id: 'b', zone: 'thamel', type: 'harassment', ts: NOW - 2 * 3600000, time: Temporal.exactTime(NOW - 2 * 3600000), lat: 27.716, lng: 85.313 },
+    { id: 'c', zone: 'patan', type: 'infrastructure', ts: NOW - 3 * 86400000, time: Temporal.exactTime(NOW - 3 * 86400000), lat: 27.673, lng: 85.324 },
+    { id: 'future', zone: 'patan', type: 'theft', ts: NOW + 86400000, time: Temporal.exactTime(NOW + 86400000), lat: 27.673, lng: 85.324 }
   ];
   const quality = buildDataQuality(incidents, ZONES, NOW);
   const result = buildIntelligence({ incidents, zones: ZONES, types: INCIDENT_TYPES, now: NOW });
@@ -32,6 +33,33 @@ test('intelligence consumes the same validated incident snapshot as risk analyti
   assert.equal(result.dataCoverage.analyzedRecords, 3);
   assert.equal(result.riskFactors[0].zone, 'Thamel');
   assert.equal(result.trend.direction, 'NO_BASELINE');
+});
+
+test('date-only records support day windows but suppress event-hour analysis', () => {
+  const ts = Date.UTC(2026, 8, 30);
+  const incident = {
+    id: 'date-only', zone: 'thamel', type: 'theft', ts,
+    time: Temporal.dateTime(ts, NOW, 'imported'),
+    lat: 27.715, lng: 85.312
+  };
+  const result = buildIntelligence({ incidents: [incident], zones: ZONES, types: INCIDENT_TYPES, now: NOW });
+  assert.equal(result.dataCoverage.analyzedRecords, 1);
+  assert.equal(result.dataCoverage.hourlyEligibleRecords, 0);
+  assert.match(result.patterns[3], /Hourly pattern unavailable/);
+});
+
+test('legacy timestamps without precision metadata are reported and excluded from time windows', () => {
+  const incident = {
+    id: 'legacy', zone: 'thamel', type: 'theft', ts: NOW - 1000,
+    lat: 27.715, lng: 85.312
+  };
+  const quality = buildDataQuality([incident], ZONES, NOW);
+  const result = buildIntelligence({ incidents: [incident], zones: ZONES, types: INCIDENT_TYPES, now: NOW });
+  assert.equal(quality.recordsAccepted, 1);
+  assert.equal(quality.temporalCoverage.recordsWithoutKnownTime, 1);
+  assert.equal(result.dataCoverage.analyzedRecords, 0);
+  assert.equal(result.trend.direction, 'UNAVAILABLE');
+  assert.match(result.summary, /unknown, future, or boundary-ambiguous timing/);
 });
 
 test('data quality rejects invalid coordinates and unknown types', () => {

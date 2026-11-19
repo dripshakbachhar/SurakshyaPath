@@ -68,17 +68,14 @@ function computeAllocation({
     officers: budget,
     zones: activeZones.map((zone, index) => {
       const peak = zone.peakHour;
-      const from = peak !== null
-        ? String((peak + 23) % 24).padStart(2, '0')
-        : '18';
-      const to = peak !== null
-        ? String((peak + 3) % 24).padStart(2, '0')
-        : '22';
+      const from = peak === null ? null : String((peak + 23) % 24).padStart(2, '0');
+      const to = peak === null ? null : String((peak + 3) % 24).padStart(2, '0');
 
       return {
         ...zone,
         officers: assigned[index].floor,
-        window: `${from}:00–${to}:00`,
+        window: peak === null ? null : `${from}:00–${to}:00 UTC`,
+        windowStatus: peak === null ? 'UNAVAILABLE' : 'AVAILABLE',
       };
     }),
   };

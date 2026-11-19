@@ -3,6 +3,7 @@
 const MAX_RECORDS = 50000;
 const MAX_ZONES = 100;
 const MAX_CATEGORIES = 100;
+const Temporal = require('../public/js/temporal');
 
 function makeIds(labels, prefix) {
   const ids = new Map();
@@ -60,6 +61,12 @@ function prepareImportedDataset({ name, records }, now = Date.now()) {
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) throw new Error(`Record ${index + 1} has an invalid longitude.`);
     if (!Number.isFinite(ts) || ts < 0 || ts > now) throw new Error(`Record ${index + 1} has an invalid or future date.`);
     if (!Number.isFinite(severity) || severity < 0 || severity > 10) throw new Error(`Record ${index + 1} has an invalid severity (use a value from 0 to 10).`);
+    let time;
+    try {
+      time = Temporal.normalizeImportedTime(record.time, ts, now);
+    } catch (error) {
+      throw new Error(`Record ${index + 1} has invalid time precision metadata: ${error.message}`);
+    }
 
     const zoneKey = zoneName.toLocaleLowerCase();
     const categoryKey = category.toLocaleLowerCase();
@@ -73,6 +80,7 @@ function prepareImportedDataset({ name, records }, now = Date.now()) {
       lat,
       lng,
       ts,
+      time,
       severity,
       sourceType: 'user-import',
       dataStatus: 'IMPORTED',
@@ -112,6 +120,7 @@ function prepareImportedDataset({ name, records }, now = Date.now()) {
     lat: record.lat,
     lng: record.lng,
     ts: record.ts,
+    time: record.time,
     severity: record.severity,
     sourceType: record.sourceType,
     dataStatus: record.dataStatus,

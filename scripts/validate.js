@@ -7,6 +7,7 @@ const { scoreModels } = require("../algorithms/research-models");
 const { computeAllocation } = require("../algorithms/allocation");
 const { computePatrol } = require("../algorithms/routing");
 const { computeZones } = require("../algorithms/risk");
+const Temporal = require("../public/js/temporal");
 
 const csv = fs.readFileSync(
   path.join(__dirname, "../data/synthetic_incidents.csv"),
@@ -82,8 +83,8 @@ const types = {
   infrastructure: { severity: 2 }
 };
 const liveIncidents = [
-  { zone: "thamel", type: "theft", ts: now - 3600000 },
-  { zone: "bouddha", type: "harassment", ts: now - 7200000 }
+  { zone: "thamel", type: "theft", ts: now - 3600000, time: Temporal.exactTime(now - 3600000) },
+  { zone: "bouddha", type: "harassment", ts: now - 7200000, time: Temporal.exactTime(now - 7200000) }
 ];
 
 const riskA = computeZones({ zones: ZONES, incidents: liveIncidents, types, now });

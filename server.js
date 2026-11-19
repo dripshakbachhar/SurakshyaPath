@@ -11,7 +11,9 @@ const { computeZones: computeZonesFromModel } = require('./algorithms/risk');
 const { computePatrol: computePatrolFromModel } = require('./algorithms/routing');
 const { computeAllocation: computeAllocationFromModel } = require('./algorithms/allocation');
 const { buildDatasetResearch } = require('./algorithms/dataset-research');
+const { buildAnalytics, buildStats: buildStatsForSnapshot } = require('./algorithms/analytics');
 const { buildDataQuality, buildIntelligence } = require('./algorithms/intelligence');
+const Temporal = require('./public/js/temporal');
 const { loadSyntheticIncidents } = require('./data/live-incidents');
 const { prepareImportedDataset } = require('./data/imported-dataset');
 const RESEARCH_SUMMARY = require('./experiments/results/summary/research-summary.json');
@@ -35,11 +37,10 @@ const DEMO_STATIONS = [
   { id: 'chabahil', name: 'Chabahil', lat: 27.717, lng: 85.348 }
 ];
 
-const DAY_MS = 86400000;
 const DATA_FILE = path.join(__dirname, 'data', 'incidents.json');
 const USER_DATASET_FILE = path.join(__dirname, 'data', 'imported-dataset.json');
 const ACTIVE_MODE_FILE = path.join(__dirname, 'data', 'active-dataset.json');
-const VALID_REPORT_WINDOWS = new Set(['now', 'today', 'week', 'month']);
+const VALID_REPORT_WINDOWS = new Set(Temporal.REPORT_WINDOWS);
 const MAX_REPORT_NOTE_LENGTH = 280;
 const MAX_INCIDENTS = 50000;
 const RATE_LIMIT_WINDOW_MS = 60000;
@@ -182,11 +183,9 @@ function allowReport(ip) {
 function validCoordinate(n, min, max) {
   return typeof n === 'number' && Number.isFinite(n) && n >= min && n <= max;
 }
-function incidentTimestamp(when) {
+function incidentTimeWindow(when) {
   const now = snapshotNow();
-  if (when === 'today') return now - 3 * 60 * 60 * 1000;
-  if (when === 'week') return now - 3 * DAY_MS;
-  return now;
+  return Temporal.communityReportTime(when, now);
 }
 function nearestZone(lat, lng) {
   let best = null, bestDistance = Infinity;
@@ -196,12 +195,15 @@ function nearestZone(lat, lng) {
   }
   return best;
 }
-function snapshotNow() { return Math.floor(Date.now() / 60000) * 60000; }
+function snapshotNow() { return Date.now(); }
 function computeZones() {
   const now = snapshotNow();
   if (riskCache && now - riskCache.at < RISK_CACHE_MS) return riskCache.zones;
   riskCache = { at: now, zones: computeZonesFromModel({ zones: activeZones, incidents, types: activeTypes, days: 30, now }) };
   return riskCache.zones;
+}
+function buildStats(source, now, zones = activeZones) {
+  return buildStatsForSnapshot(source, now, zones, activeTypes);
 }
 function computePatrol(stationId, stopCount = 5) {
   const station = activeStations.find(s => s.id === stationId) || activeStations[0];
@@ -286,9 +288,10 @@ app.post('/api/incidents', (req, res) => {
   if (!allowReport(req.ip)) return res.status(429).json({ error: 'Too many reports. Please try again later.' });
 
   const zone = nearestZone(lat, lng);
+  const reportTime = incidentTimeWindow(when || 'now');
   const incident = {
     id: 'incident-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
-    zone: zone.id, type, severity: DEMO_TYPES[type].severity, ts: incidentTimestamp(when), reporter: 'Anonymous',
+    zone: zone.id, type, severity: DEMO_TYPES[type].severity, ...reportTime, reporter: 'Anonymous',
     note: typeof note === 'string' ? note.trim().slice(0, MAX_REPORT_NOTE_LENGTH) || sampleNotes[type][0] : sampleNotes[type][0],
     sourceType: 'community-report', dataStatus: 'LIVE',
     lat: Number(lat.toFixed(5)), lng: Number(lng.toFixed(5))
@@ -317,28 +320,6 @@ app.get('/api/allocation', (req, res) => {
   res.json(computeAllocation(officers));
 });
 
-function buildAnalytics(source, now = Date.now()) {
-  const recent = source.filter(i => now - i.ts >= 0);
-  const last24h = recent.filter(i => now - i.ts < DAY_MS).length;
-  const last7d = recent.filter(i => now - i.ts < 7 * DAY_MS).length;
-  const last30d = recent.filter(i => now - i.ts < 30 * DAY_MS).length;
-  const byType = {}, byHour = Array(24).fill(0), byDay = Array.from({ length: 30 }, (_, i) => ({ day: i + 1, count: 0 }));
-  for (const incident of recent) {
-    byType[incident.type] = (byType[incident.type] || 0) + 1;
-    byHour[new Date(incident.ts).getHours()]++;
-    const ageDays = Math.floor((now - incident.ts) / DAY_MS);
-    if (ageDays < 30) byDay[29 - ageDays].count++;
-  }
-  return { total: recent.length, last24h, last7d, last30d, byType, byHour, byDay };
-}
-function buildStats(source, now, zones = activeZones) {
-  const window = source.filter(i => now - i.ts >= 0 && now - i.ts < 30 * DAY_MS);
-  const activeZones = new Set(window.map(i => i.zone)).size;
-  const riskZones = computeZonesFromModel({ zones, incidents: source, types: activeTypes, days: 30, now });
-  const highRiskZones = riskZones.filter(z => z.band === 'high' || z.band === 'critical').length;
-  const night = window.filter(i => { const h = new Date(i.ts).getHours(); return h >= 20 || h < 4; }).length;
-  return { total: source.length, activeZones, highRiskZones, nightShare: window.length ? Math.round(night / window.length * 100) : 0 };
-}
 app.get('/api/analytics', (req, res) => res.json(buildAnalytics(incidents)));
 app.get('/api/data-quality', (req, res) => res.json(buildDataQuality(incidents, activeZones, Date.now(), activeTypes)));
 app.get('/api/intelligence', (req, res) => res.json(buildIntelligence({ incidents, zones: activeZones, riskZones: computeZones(), types: activeTypes })));
@@ -361,7 +342,7 @@ app.get('/api/dashboard', (req, res) => {
   const zones = computeZonesFromModel({ zones: activeZones, incidents: snapshot, types: activeTypes, days: 30, now });
   const intelligence = buildIntelligence({ incidents: snapshot, zones: activeZones, riskZones: zones, types: activeTypes, now });
   const dataQuality = buildDataQuality(snapshot, activeZones, now, activeTypes);
-  res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now, activeZones), intelligence, dataQuality, dataset: datasetSummary(), types: activeTypes, stations: activeStations });
+  res.json({ incidents: snapshot, zones, analytics: buildAnalytics(snapshot, now), stats: buildStats(snapshot, now, activeZones, activeTypes), intelligence, dataQuality, dataset: datasetSummary(), types: activeTypes, stations: activeStations });
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API endpoint not found.' }));

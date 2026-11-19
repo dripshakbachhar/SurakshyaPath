@@ -37,6 +37,10 @@ The recency formulation uses a fixed 30-day window and a minimum decay contribut
 
 Different decay functions, windows, or minimum contributions could produce different results.
 
+The fixed synthetic benchmark supplies integer `age_days`, not observed event timestamps. Runtime dates are marked as synthetic and use UTC day precision. The dashboard does not infer event hours from them. For imported data, exact times, date-only values, approximate ranges, and unknown legacy timestamps remain distinct; rolling counts are unavailable when a time range overlaps a window boundary or an unknown timestamp could affect inclusion. Hourly metrics use only exact, non-synthetic timestamps and report UTC.
+
+Community-report time options have explicit semantics: `now` means the preceding 60 minutes; `today` means UTC midnight through submission; `week` means the preceding 7 × 24 hours; and `month` means the preceding 30 × 24 hours. These are approximate report windows, not exact event times.
+
 ## 6. Resource allocation
 
 The primary comparison uses a fixed budget of 12 officers and a largest-remainder allocation rule.
