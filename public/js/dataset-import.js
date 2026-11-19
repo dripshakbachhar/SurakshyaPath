@@ -12,14 +12,23 @@
   function parseCsv(text) {
     const source = String(text).replace(/^\uFEFF/, '');
     const rows = [];
-    let row = [], field = '', quoted = false;
+    let row = [], field = '', quoted = false, closedQuote = false;
     for (let i = 0; i < source.length; i++) {
       const char = source[i];
       if (quoted) {
         if (char === '"' && source[i + 1] === '"') { field += '"'; i++; }
-        else if (char === '"') quoted = false;
+        else if (char === '"') { quoted = false; closedQuote = true; }
         else field += char;
+      } else if (closedQuote) {
+        if (char === ',') { row.push(field); field = ''; closedQuote = false; }
+        else if (char === '\n' || char === '\r') {
+          row.push(field); field = ''; closedQuote = false;
+          if (row.some(value => value.trim() !== '')) rows.push(row);
+          row = [];
+          if (char === '\r' && source[i + 1] === '\n') i++;
+        } else throw new Error('CSV contains characters after a quoted field.');
       } else if (char === '"' && field.length === 0) quoted = true;
+      else if (char === '"') throw new Error('CSV contains a quote in an unquoted field.');
       else if (char === ',') { row.push(field); field = ''; }
       else if (char === '\n' || char === '\r') {
         row.push(field); field = '';
