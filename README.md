@@ -1,3 +1,19 @@
+
+<p align="center">
+  <img src="assets/visuals/03_github_readme_hero.png" width="100%">
+</p>
+
+## Research Overview
+
+<p align="center">
+  <img src="assets/visuals/01_graphical_abstract.png" width="100%">
+</p>
+
+## Research Poster
+
+<p align="center">
+  <img src="assets/visuals/02_linkedin_research_poster.png" width="75%">
+</p>
 # SurakshyaPath · सुरक्षापथ
 
 **An experimental research platform for exploring how spatial-prioritization models influence route and resource-allocation experiments.**
