@@ -22,15 +22,38 @@ const RESEARCH_SUMMARY = require('./experiments/results/summary/research-summary
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: ImportLimits.MAX_IMPORT_PAYLOAD_BYTES }));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'geolocation=(self)');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; script-src-attr 'none'; " +
+    "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; " +
+    "img-src 'self' data: blob: https://cdnjs.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org; " +
+    "font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'none'; " +
+    "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+  );
   if (req.path.startsWith('/api/')) res.setHeader('Cache-Control', 'no-store');
   next();
 });
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/') || ['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const origin = req.get('Origin');
+  if (!origin) return next();
+  try {
+    const parsedOrigin = new URL(origin);
+    if (!['http:', 'https:'].includes(parsedOrigin.protocol) ||
+        parsedOrigin.host.toLowerCase() !== String(req.get('host') || '').toLowerCase()) {
+      return res.status(403).json({ error: 'Cross-origin mutation requests are not allowed.' });
+    }
+  } catch {
+    return res.status(403).json({ error: 'Cross-origin mutation requests are not allowed.' });
+  }
+  next();
+});
+app.use(express.json({ limit: ImportLimits.MAX_IMPORT_PAYLOAD_BYTES }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const DEMO_STATIONS = [

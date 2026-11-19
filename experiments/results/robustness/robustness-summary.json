@@ -49,7 +49,7 @@
     "inputArtifacts": [],
     "softwareVersion": "1.1.0",
     "commit": null,
-    "executedAt": "2026-11-19T07:36:05.367Z",
+    "executedAt": "2026-11-19T08:31:05.309Z",
     "metrics": {
       "meanAbsoluteRankShift": {
         "unit": "rank positions vs frequency-only"

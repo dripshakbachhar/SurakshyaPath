@@ -110,9 +110,35 @@ $('#detail-close').onclick=closeDetail;$('#detail-backdrop').onclick=closeDetail
   else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
 });
 
-function renderTypeChart(values){const root=$('#chart-type');if(!root)return;const entries=Object.entries(values||{}).filter(([,v])=>Number(v)>0),total=entries.reduce((s,[,v])=>s+Number(v),0)||1;let cursor=0;const segments=entries.map(([type,v])=>{const share=Number(v)/total,dash=share*100,offset=-(cursor/total*100);cursor+=Number(v);return{type,value:Number(v),dash,offset};});const circles=segments.map(s=>`<circle class="donut-ring" data-type="${esc(s.type)}" cx="70" cy="70" r="50" pathLength="100" stroke="${TYPE_META[s.type]?.color||'#64748b'}" stroke-width="18" stroke-dasharray="${s.dash} ${100-s.dash}" stroke-dashoffset="${s.offset}" aria-label="${esc(TYPE_META[s.type]?.label||s.type)}: ${s.value}" tabindex="0"></circle>`).join('');root.innerHTML=`<div class="donut-wrap"><div class="donut-svg"><svg viewBox="0 0 140 140" role="img" aria-label="Incidents by type">${circles}</svg><div class="donut-hole"><b>${total}</b><span>reports</span></div></div><div class="chart-legend">${segments.map(s=>`<button data-type="${esc(s.type)}"><i style="background:${TYPE_META[s.type]?.color||'#64748b'}"></i><span>${esc(TYPE_META[s.type]?.label||s.type)}</span><b>${s.value}</b></button>`).join('')}</div></div>`;const openType=type=>{const n=Number(values[type]||0);openAnalyticsDetail(TYPE_META[type]?.label||type,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>Share of dashboard records: ${(n/total*100).toFixed(1)}%.</p>`);};root.querySelectorAll('[data-type]').forEach(b=>{b.onclick=()=>openType(b.dataset.type);b.onkeydown=e=>{if(e.key==='Enter'||e.key===' ')openType(b.dataset.type);};});}
-function renderHourChart(values,coverage){const root=$('#chart-hour');if(!root)return;const excluded=coverage?.hourlyExcludedRecords??0;const exclusions=Object.entries(coverage?.hourlyExcludedByPrecision||{}).map(([kind,count])=>`${count} ${kind.replace(':',' ')}`).join(', ');if(!Array.isArray(values)){root.innerHTML=`<p class="muted">Unavailable — no exact, non-synthetic event timestamps support an hour-of-day analysis. ${excluded} records excluded${exclusions?`: ${esc(exclusions)}`:''}.</p>`;return;}const max=Math.max(...values.map(Number),1);root.innerHTML=`<div class="bar-chart">${values.map((v,h)=>`<button class="bar" data-hour="${h}" title="${String(h).padStart(2,'0')}:00 UTC · ${v} records"><span style="height:${Math.max(3,Number(v)/max*100)}%;background:${h>=20||h<4?'#ef4444':'#3b82f6'}"></span><small>${h%3===0?h:''}</small></button>`).join('')}</div><p class="muted small">${coverage?.hourlyEligibleRecords??0} exact-time records shown; ${excluded} records excluded from hourly analysis${exclusions?` (${esc(exclusions)})`:''}.</p>`;root.querySelectorAll('[data-hour]').forEach(b=>b.onclick=()=>{const h=Number(b.dataset.hour),n=Number(values[h]||0);openAnalyticsDetail(`Hour ${String(h).padStart(2,'0')} UTC`,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>${h>=20||h<4?'This hour falls inside the dashboard night window (20:00–04:00 UTC).':'This hour falls outside the dashboard night window.'}</p>`);});}
-function renderTrendChart(values,coverage){const root=$('#chart-trend');if(!root)return;const nums=values.map(d=>Number(d.count)||0),max=Math.max(...nums,1);root.innerHTML=`<div class="trend-chart">${values.map((d,i)=>`<button class="trend-point" data-index="${i}" title="${esc(d.date)} UTC · ${d.count} records" style="left:${nums.length===1?50:i/(nums.length-1)*100}%;bottom:${nums[i]/max*82+8}%"><span></span></button>`).join('')}<div class="trend-line"></div><div class="axis"><span>${esc(values[0]?.date||'')}</span><span>today · UTC</span></div></div>${coverage?.dailyExcludedRecords?`<p class="muted small">${coverage.dailyExcludedRecords} records with missing, unknown, or multi-day timing were excluded from daily bins.</p>`:''}`;root.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{const d=values[Number(b.dataset.index)];openAnalyticsDetail(`${d.date} UTC`,`<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p>Records assigned to this UTC calendar date. Unknown or multi-day time ranges are not assigned to a single date.</p>`);});}
+function renderTypeChart(values){
+  const root=$('#chart-type');
+  if(!root)return;
+  const entries=Object.entries(values||{}).filter(([,value])=>Number(value)>0);
+  const total=entries.reduce((sum,[,value])=>sum+Number(value),0);
+  if(!total){
+    root.innerHTML='<p class="muted">No classified records are available for this chart.</p>';
+    return;
+  }
+  let cursor=0;
+  const segments=entries.map(([type,value])=>{
+    const count=Number(value),share=count/total,dash=share*100,offset=-(cursor/total*100);
+    cursor+=count;
+    return{type,value:count,dash,offset};
+  });
+  const circles=segments.map(segment=>`<circle class="donut-ring" data-type="${esc(segment.type)}" cx="70" cy="70" r="50" pathLength="100" stroke="${TYPE_META[segment.type]?.color||'#64748b'}" stroke-width="18" stroke-dasharray="${segment.dash} ${100-segment.dash}" stroke-dashoffset="${segment.offset}" aria-hidden="true"></circle>`).join('');
+  const legend=segments.map(segment=>{
+    const label=TYPE_META[segment.type]?.label||segment.type;
+    return `<button type="button" data-type="${esc(segment.type)}" aria-label="${esc(label)}: ${segment.value} records"><i style="background:${TYPE_META[segment.type]?.color||'#64748b'}"></i><span>${esc(label)}</span><b>${segment.value}</b></button>`;
+  }).join('');
+  root.innerHTML=`<div class="donut-wrap"><div class="donut-svg"><svg viewBox="0 0 140 140" role="img" aria-label="Incident type proportions; use the legend buttons for details">${circles}</svg><div class="donut-hole"><b>${total}</b><span>records</span></div></div><div class="chart-legend">${legend}</div></div>`;
+  const openType=type=>{
+    const count=Number(values[type]||0);
+    openAnalyticsDetail(TYPE_META[type]?.label||type,`<div class="detail-stat"><b>${count}</b><span>records</span></div><p>Share of dashboard records: ${(count/total*100).toFixed(1)}%.</p>`);
+  };
+  root.querySelectorAll('[data-type]').forEach(element=>element.onclick=()=>openType(element.dataset.type));
+}
+function renderHourChart(values,coverage){const root=$('#chart-hour');if(!root)return;const excluded=coverage?.hourlyExcludedRecords??0;const exclusions=Object.entries(coverage?.hourlyExcludedByPrecision||{}).map(([kind,count])=>`${count} ${kind.replace(':',' ')}`).join(', ');if(!Array.isArray(values)||!values.some(value=>Number(value)>0)){root.innerHTML=`<p class="muted">Unavailable — no exact, non-synthetic event timestamps support an hour-of-day analysis. ${excluded} records excluded${exclusions?`: ${esc(exclusions)}`:''}.</p>`;return;}const max=Math.max(...values.map(Number),1);root.innerHTML=`<div class="bar-chart">${values.map((v,h)=>`<button type="button" class="bar" data-hour="${h}" aria-label="Hour ${String(h).padStart(2,'0')} UTC: ${v} records" title="${String(h).padStart(2,'0')}:00 UTC · ${v} records"><span style="height:${Math.max(3,Number(v)/max*100)}%;background:${h>=20||h<4?'#ef4444':'#3b82f6'}"></span><small>${h%3===0?h:''}</small></button>`).join('')}</div><p class="muted small">${coverage?.hourlyEligibleRecords??0} exact-time records shown; ${excluded} records excluded from hourly analysis${exclusions?` (${esc(exclusions)})`:''}.</p>`;root.querySelectorAll('[data-hour]').forEach(b=>b.onclick=()=>{const h=Number(b.dataset.hour),n=Number(values[h]||0);openAnalyticsDetail(`Hour ${String(h).padStart(2,'0')} UTC`,`<div class="detail-stat"><b>${n}</b><span>records</span></div><p>${h>=20||h<4?'This hour falls inside the dashboard night window (20:00–04:00 UTC).':'This hour falls outside the dashboard night window.'}</p>`);});}
+function renderTrendChart(values,coverage){const root=$('#chart-trend');if(!root)return;if(!Array.isArray(values)||!values.length){root.innerHTML='<p class="muted">Daily analysis is unavailable for this snapshot.</p>';return;}const nums=values.map(d=>Number(d.count)||0),max=Math.max(...nums,1);root.innerHTML=`<div class="trend-chart">${values.map((d,i)=>`<button class="trend-point" data-index="${i}" aria-label="${esc(d.date)} UTC: ${d.count} records" title="${esc(d.date)} UTC · ${d.count} records" style="left:${nums.length===1?50:i/(nums.length-1)*100}%;bottom:${nums[i]/max*82+8}%"><span></span></button>`).join('')}<div class="trend-line"></div><div class="axis"><span>${esc(values[0]?.date||'')}</span><span>today · UTC</span></div></div>${coverage?.dailyExcludedRecords?`<p class="muted small">${coverage.dailyExcludedRecords} records with missing, unknown, or multi-day timing were excluded from daily bins.</p>`:''}`;root.querySelectorAll('[data-index]').forEach(b=>b.onclick=()=>{const d=values[Number(b.dataset.index)];openAnalyticsDetail(`${d.date} UTC`,`<div class="detail-stat"><b>${d.count}</b><span>records</span></div><p>Records assigned to this UTC calendar date. Unknown or multi-day time ranges are not assigned to a single date.</p>`);});}
 function drawCharts(a){if(a){renderTypeChart(a.byType);renderHourChart(a.byHour,a.temporalCoverage);renderTrendChart(a.byDay,a.temporalCoverage);}}
 
 function renderIntelligence(){
@@ -143,25 +169,44 @@ function renderResearchSummary(summary){
   };
   const tbody=$('#research-results');
   const rankResults=summary.risk||[],allocationResults=summary.allocation||[],patrolResults=summary.patrol||[];
+  const metric=(value,format=value=>String(value))=>
+    value===null||value===undefined||value===''||!Number.isFinite(Number(value))
+      ? 'Unavailable'
+      : format(Number(value));
+  const source={...(summary.sourceDataset||{}),...(summary.provenance?.sourceDataset||{})};
+  const zoneCount=source.zoneCount??10;
   tbody.innerHTML=rankResults.map(result=>{
     const allocation=allocationResults.find(item=>item.model===result.model);
     const patrol=patrolResults.find(item=>item.model===result.model);
-    return `<tr><th scope="row">${esc(labels[result.model]||result.model)}</th><td>${esc(result.top_zone)}</td><td>${Number(result.zones_with_rank_change)}</td><td>${Number(allocation?.zones_with_changed_allocation??0)} / 10</td><td>${Number(patrol?.optimized_km??0).toFixed(2)} km</td></tr>`;
-  }).join('');
+    const changedRanks=metric(result.zones_with_rank_change);
+    const changedAllocations=metric(allocation?.zones_with_changed_allocation);
+    const routeDistance=metric(patrol?.optimized_km,value=>`${value.toFixed(2)} km`);
+    return `<tr><th scope="row">${esc(labels[result.model]||result.model)}</th><td>${esc(result.top_zone||'Unavailable')}</td><td>${changedRanks}</td><td>${changedAllocations==='Unavailable'?changedAllocations:`${changedAllocations} / ${zoneCount}`}</td><td>${routeDistance}</td></tr>`;
+  }).join('')||'<tr><td colspan="5">Canonical research metrics are unavailable.</td></tr>';
   const severityRank=rankResults.find(result=>result.model==='severity-only');
   const severityAllocation=allocationResults.find(result=>result.model==='severity-only');
   const status=$('#research-results-status');
-  status.textContent=`Stored canonical results loaded · ${summary.sourceDataset?.id||'canonical-synthetic-benchmark-v1'} · seed 208304 · frequency-only reference · ${rankResults.length} models`;
-  status.className='research-results-status';
-  const source=summary.sourceDataset||{};
+  status.textContent=rankResults.length
+    ? `Stored canonical results loaded · ${source.id||'canonical-synthetic-benchmark-v1'} · seed 208304 · frequency-only reference · ${rankResults.length} models`
+    : 'Canonical research metrics are unavailable.';
+  status.className=rankResults.length?'research-results-status':'research-results-status error';
   const precision=Object.entries(source.temporalCoverage?.precisionCounts||{})
     .map(([kind,count])=>`${count} ${kind}`).join(', ')||'precision unavailable';
   const config=summary.modelConfiguration||{};
   const modelNames=(config.scoringModels||rankResults.map(result=>result.model)).join(', ');
-  const warnings=(summary.warnings||[]).join(' ');
-  $('#research-source-summary').textContent=`Source ${source.id||'canonical-synthetic-benchmark-v1'} · ${Number(source.recordCount||1567).toLocaleString()} records · ${Number(source.zoneCount||10)} zones · ${precision}. Version/hash not recorded for this fixed result set. Models: ${modelNames}; reference ${config.referenceModel||summary.risk_reference_model||'frequency-only'}; allocation budget ${config.allocationBudget||summary.officer_budget||12}. ${source.temporalCoverage?.hourlyAnalysis?.explanation||''} ${warnings}`;
-  $('#research-highlight').textContent=`In the canonical scenario, severity-only re-ranked ${severityRank?.zones_with_rank_change??0} of 10 zones and changed the 12-officer allocation in ${severityAllocation?.zones_with_changed_allocation??0} zones.`;
-  $('#research-highlight').hidden=false;
+  const hourlyExplanation=source.temporalCoverage?.hourlyAnalysis?.explanation||'';
+  const warnings=(summary.warnings||[]).filter(warning=>warning!==hourlyExplanation).join(' ');
+  const contentHash=source.contentHash?.value||summary.provenance?.contentHash?.value;
+  const version=source.version||source.schemaVersion||summary.provenance?.schemaVersion||'not recorded';
+  const hashLabel=contentHash?`SHA-256 ${contentHash}`:'content hash not recorded';
+  const recordCount=source.recordCount===undefined?'unavailable':Number(source.recordCount).toLocaleString();
+  $('#research-source-summary').textContent=`Source ${source.id||'canonical-synthetic-benchmark-v1'} (${source.name||'canonical synthetic benchmark'}) · ${recordCount} records · ${zoneCount} zones · ${precision}. Version ${version} · ${hashLabel}. Models: ${modelNames||'unavailable'}; reference ${config.referenceModel||summary.risk_reference_model||'frequency-only'}; allocation budget ${config.allocationBudget||summary.officer_budget||'unavailable'}. ${hourlyExplanation} ${warnings}`;
+  if(severityRank&&severityAllocation){
+    $('#research-highlight').textContent=`In the canonical scenario, severity-only re-ranked ${metric(severityRank.zones_with_rank_change)} of ${zoneCount} zones and changed the 12-officer allocation in ${metric(severityAllocation.zones_with_changed_allocation)} zones.`;
+    $('#research-highlight').hidden=false;
+  }else{
+    $('#research-highlight').hidden=true;
+  }
 }
 
 async function refreshData(){
@@ -179,6 +224,13 @@ async function refreshData(){
       $('#dataset-research-methods').classList.add('hidden');
     }
     state.dataset=nextDataset;state.datasetKey=nextKey;
+    if(datasetChanged){
+      layers.route.clearLayers();
+      $('#route-card').classList.add('hidden');
+      $('#alloc-card').classList.add('hidden');
+      $('#route-card').textContent='';
+      $('#alloc-card').textContent='';
+    }
     if(dashboard.types){state.types=dashboard.types;syncTypeMetadata();}
     if(Array.isArray(dashboard.stations)){
       const selected=$('#p-station').value;
@@ -193,6 +245,12 @@ async function refreshData(){
     state.dataQuality=dashboard.dataQuality||null;
     state.storage=dashboard.storage||{writable:true};
     updateDatasetUI();renderOverview();updateStats();renderIntelligence();renderMapZones();drawZones();drawMarkers();drawHeat();renderZoneList();
+    if($('#tab-report').disabled&&state.tab==='report'){
+      setTab('overview',{pushHistory:false});
+      const url=new URL(location.href);
+      url.searchParams.delete('tab');
+      history.replaceState(null,'',url);
+    }
     if(datasetChanged&&state.zones.length){
       const bounds=L.latLngBounds(state.zones.map(zone=>[zone.lat,zone.lng]));
       if(bounds.isValid()){
@@ -201,8 +259,15 @@ async function refreshData(){
         defaultView={center:[center.lat,center.lng],zoom:map.getZoom()};
       }
     }
+    if(datasetChanged)restorePatrolPlan();
     if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));
-    $('#connection').textContent='Online';$('#connection').className='connection live';
+    const connection=$('#connection');
+    const readOnly=state.storage.writable===false ||
+      ['public-read-only','unsupported'].includes(state.storage.operatingMode);
+    const partial=Number(state.dataQuality?.recordsRejected||0)>0 ||
+      state.intelligence?.status==='PARTIAL_SUCCESS';
+    connection.textContent=readOnly?'Read-only':partial?'Partial data':'Online';
+    connection.className=`connection ${readOnly?'readonly':partial?'partial':'live'}`;
     lastSuccessfulRefresh=new Date();
     const updated=$('#data-updated');
     updated.textContent=`Updated ${lastSuccessfulRefresh.toLocaleTimeString('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})} UTC`;
@@ -211,9 +276,12 @@ async function refreshData(){
   }catch(err){
     $('#connection').textContent='Offline';$('#connection').className='connection offline';
     const updated=$('#data-updated');
-    updated.textContent=lastSuccessfulRefresh?`Stale · updated ${lastSuccessfulRefresh.toLocaleTimeString('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})} UTC`:'No data loaded';
-    updated.title=lastSuccessfulRefresh?`Last successful update ${lastSuccessfulRefresh.toLocaleString('en-GB',{timeZone:'UTC'})} UTC`:'The dashboard has not loaded data yet.';
-    toast(err.message||'Could not load dashboard.',false);
+    updated.textContent=lastSuccessfulRefresh
+      ? `Showing stale data · updated ${lastSuccessfulRefresh.toLocaleTimeString('en-GB',{timeZone:'UTC',hour:'2-digit',minute:'2-digit'})} UTC`
+      : 'Dashboard data unavailable';
+    updated.title=lastSuccessfulRefresh
+      ? `Last successful update ${lastSuccessfulRefresh.toLocaleString('en-GB',{timeZone:'UTC'})} UTC. Refresh error: ${err.message||'unknown error'}`
+      : `The dashboard has not loaded data. ${err.message||'The data service is unavailable.'}`;
   }
   finally{state.loading=false;}
 }
@@ -228,14 +296,20 @@ function renderOverview(){
     }else focusZone(button.dataset.zone);
   });
   const dataset=state.dataset||{};
+  const readOnly=state.storage?.writable===false ||
+    (state.storage?.operatingMode!==undefined&&state.storage.operatingMode!=='local-research');
   $('#overview-dataset-name').textContent=dataset.name||'Dashboard dataset';
   $('#overview-dataset-detail').textContent=`${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones`;
   $('#overview-dataset-description').textContent=dataset.mode==='imported'
     ? 'The map and activity below use your imported dataset. Imported results are descriptive and depend on the quality and provenance of the source data.'
-    : 'The map and activity below show the synthetic demo snapshot, including reports submitted through this app. Import a separate dataset from Datasets.';
+    : readOnly
+      ? 'The map and activity below show the canonical synthetic demo snapshot. Public read-only mode does not accept community-report writes.'
+      : 'The map and activity below show the synthetic demo snapshot, including reports submitted through this app. Import a separate dataset from Datasets.';
   $('.dashboard-note').innerHTML=dataset.mode==='imported'
     ? 'Imported dashboard data is separate from the fixed research experiment. The canonical synthetic results remain in <button type="button" class="inline-link" data-go="research">Research</button>.'
-    : 'This live view can include reports submitted through the app. Fixed synthetic experiment results are in <button type="button" class="inline-link" data-go="research">Research</button>.';
+    : readOnly
+      ? 'Community reports are disabled in public read-only mode. Fixed synthetic experiment results are in <button type="button" class="inline-link" data-go="research">Research</button>.'
+      : 'This live view can include reports submitted through the app. Fixed synthetic experiment results are in <button type="button" class="inline-link" data-go="research">Research</button>.';
 }
 function updateDatasetUI(){
   const dataset=state.dataset||{};
@@ -243,6 +317,7 @@ function updateDatasetUI(){
   const storage=state.storage||{writable:true};
   const readOnly=storage.writable===false ||
     (storage.operatingMode !== undefined && storage.operatingMode !== 'local-research');
+  const restrictionMessage='Read-only mode: dataset imports, dataset switching, and community-report writes are disabled.';
   const modeLabel=storage.operatingMode==='public-read-only'
     ? 'Public read-only'
     : storage.operatingMode==='unsupported'
@@ -275,7 +350,7 @@ function updateDatasetUI(){
     else if(control.id!=='dataset-import-button')control.disabled=false;
   });
   if(readOnly){
-    $('#dataset-import-status').textContent=storage.reason||'Dataset imports are disabled because persistent storage is unavailable.';
+    $('#dataset-import-status').textContent=`${restrictionMessage} ${storage.reason||''}`.trim();
     $('#dataset-import-status').className='dataset-import-status error';
   }
   $('#dataset-research-run').disabled=!imported;
@@ -293,18 +368,34 @@ function renderDatasetResearch(result){
     'frequency-severity':'Frequency × severity',
     'current-severity-recency':'Severity × recency'
   };
-  $('#dataset-research-results').innerHTML=result.rows.map(row=>{const available=row.availability!=='UNAVAILABLE';const label=`${labels[row.model]||row.model}${row.availability==='PARTIAL'?' · partial':''}`;return `<tr><th scope="row">${esc(label)}</th><td>${available?esc(row.topZone):'Unavailable'}</td><td>${available?`${row.zonesReRanked} / ${row.zoneCount}`:'—'}</td><td>${available?`${row.allocationChanges} / ${row.zoneCount}`:'—'}</td><td>${available?`${Number(row.nearestNeighbourKm).toFixed(2)} km`:'—'}</td><td>${available?`${Number(row.twoOptKm).toFixed(2)} km`:'—'}</td></tr>`;}).join('');
+  const metric=(value,format=value=>String(value))=>
+    value===null||value===undefined||value===''||!Number.isFinite(Number(value))
+      ? 'Unavailable'
+      : format(Number(value));
+  const ratio=(value,total)=>value===null||value===undefined||total===null||total===undefined
+    ? 'Unavailable'
+    : `${metric(value)} / ${metric(total)}`;
+  $('#dataset-research-results').innerHTML=result.rows.map(row=>{
+    const available=['AVAILABLE','PARTIAL'].includes(row.availability);
+    const label=`${labels[row.model]||row.model}${row.availability==='PARTIAL'?' · partial':''}`;
+    return `<tr><th scope="row">${esc(label)}</th><td>${available?esc(row.topZone||'Unavailable'):'Unavailable'}</td><td>${available?ratio(row.zonesReRanked,row.zoneCount):'Unavailable'}</td><td>${available?ratio(row.allocationChanges,row.zoneCount):'Unavailable'}</td><td>${available?metric(row.nearestNeighbourKm,value=>`${value.toFixed(2)} km`):'Unavailable'}</td><td>${available?metric(row.twoOptKm,value=>`${value.toFixed(2)} km`):'Unavailable'}</td></tr>`;
+  }).join('')||'<tr><td colspan="6">Dataset comparison metrics are unavailable.</td></tr>';
   const coverage=result.dataset.temporalCoverage;
   const precision=coverage.precisionCounts||{};
   const hash=result.dataset.contentHash?.value;
-  const temporalSummary=`Precision: ${precision.instant||0} exact, ${precision.date||0} date-only, ${precision.range||0} approximate range, ${precision.unknown||0} unknown. Recency used ${coverage.recencyEligibleRecords}; ${coverage.recencyExcludedRecords} were excluded.`;
+  const count=value=>value===undefined||value===null?'unavailable':Number(value).toLocaleString();
+  const temporalSummary=`Precision: ${count(precision.instant)} exact, ${count(precision.date)} date-only, ${count(precision.range)} approximate range, ${count(precision.unknown)} unknown. Recency used ${count(coverage.recencyEligibleRecords)} records; ${count(coverage.recencyExcludedRecords)} were excluded.`;
   const warnings=(result.warnings||[]).join(' ');
-  $('#dataset-research-summary').textContent=`Source ${result.dataset.id} · ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories · schema v${result.dataset.schemaVersion||'unknown'}${hash?` · SHA-256 ${hash}`:''}. ${temporalSummary} ${warnings} These results do not replace or modify the canonical synthetic experiment.`;
+  $('#dataset-research-summary').textContent=`Source ${result.dataset.id} (${result.dataset.name||'imported dataset'}) · ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories · schema v${result.dataset.schemaVersion||'unknown'}${hash?` · SHA-256 ${hash}`:''}. ${temporalSummary} ${warnings} These results do not replace or modify the canonical synthetic experiment.`;
   $('#dataset-research-summary').hidden=false;
   $('#dataset-research-methods').textContent=`${result.methods.scoring} ${result.methods.allocation} ${result.methods.routing} ${result.methods.robustness}`;
   $('#dataset-research-methods').classList.remove('hidden');
   $('#dataset-research-table-wrap').classList.remove('hidden');
-  $('#dataset-research-status').textContent=`Dataset comparison complete · ${result.sourceDataset.id} · ${new Date(result.dataset.importedAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC`;
+  const importedAt=Date.parse(result.dataset.importedAt);
+  const importedLabel=Number.isFinite(importedAt)
+    ? `${new Date(importedAt).toLocaleString('en-GB',{timeZone:'UTC'})} UTC`
+    : 'import time unavailable';
+  $('#dataset-research-status').textContent=`Dataset comparison complete · ${result.sourceDataset.id} · ${importedLabel}`;
   $('#dataset-research-status').className='research-results-status';
   state.datasetResearch=result;
 }
@@ -359,7 +450,7 @@ function setImportValidation(summary){
 function validateImportDraft(){
   const status=$('#dataset-import-status'),button=$('#dataset-import-button');
   if(state.storage?.writable===false || (state.storage?.operatingMode !== undefined && state.storage.operatingMode !== 'local-research')){
-    status.textContent=state.storage.reason||'Dataset imports are disabled because persistent storage is unavailable.';
+    status.textContent=`Read-only mode: dataset imports, dataset switching, and community-report writes are disabled. ${state.storage.reason||''}`.trim();
     status.className='dataset-import-status error';
     button.disabled=true;
     return;
@@ -517,7 +608,41 @@ function updateStats(){
   $('#stat-recent').title=recent===null||recent===undefined?`Unavailable: ${recentCoverage?.unknown??0} unknown and ${recentCoverage?.ambiguous??0} boundary-ambiguous records affect the last-24-hour window.`:'Count of records whose supported time interval is wholly within the last 24 hours (UTC).';
 }
 function renderZoneList(){const el=$('#zone-list');if(!el)return;const zones=[...state.zones].sort((a,b)=>Number(b.score)-Number(a.score));el.innerHTML=zones.map(z=>`<li><button class="zone-item" data-zone="${esc(z.id)}"><span><b>${esc(z.name)}</b><small>${z.count} records · ${esc(recentCountLabel(z))} · peak ${z.peakHour===null?'unavailable':String(z.peakHour).padStart(2,'0')+':00 UTC'}</small></span><strong class="badge ${esc(z.band)}">${z.score}</strong></button></li>`).join('');el.querySelectorAll('[data-zone]').forEach(b=>b.onclick=()=>focusZone(b.dataset.zone));}
-function setTab(tab){state.tab=tab;$$('.tab').forEach(b=>{const selected=b.dataset.tab===tab;b.classList.toggle('active',selected);b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});$$('.panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${tab}`));const researchView=tab==='research';$('.workspace').classList.toggle('research-mode',researchView);document.body.classList.toggle('research-view',researchView);setMobileMapVisible(false);$('#panel').scrollTop=0;invalidateMapSize();if(tab==='analytics'&&state.analytics)requestAnimationFrame(()=>drawCharts(state.analytics));$('#map-mode').textContent=tab==='report'?'Click anywhere on the map to pin a report.':'Select a zone or report marker for details.';}
+function availableTab(tab){
+  return $$('#tabs .tab').some(button=>button.dataset.tab===tab&&!button.disabled)?tab:'overview';
+}
+function setTab(tab,{pushHistory=true}={}){
+  tab=availableTab(tab);
+  const changed=state.tab!==tab;
+  state.tab=tab;
+  $$('.tab').forEach(button=>{
+    const selected=button.dataset.tab===tab;
+    button.classList.toggle('active',selected);
+    button.setAttribute('aria-selected',String(selected));
+    button.tabIndex=selected?0:-1;
+  });
+  $$('.panel').forEach(panel=>{
+    const selected=panel.id===`panel-${tab}`;
+    panel.classList.toggle('active',selected);
+    panel.hidden=!selected;
+    panel.setAttribute('aria-hidden',String(!selected));
+    panel.tabIndex=selected?0:-1;
+  });
+  if(pushHistory&&changed){
+    const url=new URL(location.href);
+    if(tab==='overview')url.searchParams.delete('tab');
+    else url.searchParams.set('tab',tab);
+    history.pushState({tab},'',url);
+  }
+  const researchView=tab==='research';
+  $('.workspace').classList.toggle('research-mode',researchView);
+  document.body.classList.toggle('research-view',researchView);
+  setMobileMapVisible(false);
+  $('#panel').scrollTop=0;
+  invalidateMapSize();
+  if(tab==='analytics'&&state.analytics)requestAnimationFrame(()=>drawCharts(state.analytics));
+  $('#map-mode').textContent=tab==='report'?'Click anywhere on the map to pin a report.':'Select a zone or report marker for details.';
+}
 $('#tabs').onclick=e=>{const button=e.target.closest('.tab');if(button)setTab(button.dataset.tab);};
 $('#tabs').onkeydown=e=>{
   if(!['ArrowRight','ArrowLeft','Home','End'].includes(e.key))return;
@@ -533,7 +658,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(b
 
 $('#report-form').onsubmit=async e=>{
   e.preventDefault();if(!state.pick)return toast('Pick a location on the map first.',false);
-  const button=e.submitter;button.disabled=true;button.textContent='Submitting…';
+  const button=e.submitter||$('#report-form button[type="submit"]');button.disabled=true;button.textContent='Submitting…';
   try{
     await getJSON(`${API}/incidents`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:$('#f-type').value,when:$('#f-when').value,note:$('#f-note').value.trim(),lat:state.pick.lat,lng:state.pick.lng})});
     $('#f-note').value='';state.pick=null;$('#picked-spot').classList.remove('set');$('#picked-spot').textContent='📍 Click the map to choose a location.';
@@ -545,9 +670,36 @@ $('#report-form').onsubmit=async e=>{
 $('#toggle-heat').onchange=e=>e.target.checked?layers.heat.addTo(map):map.removeLayer(layers.heat);
 $('#toggle-markers').onchange=e=>e.target.checked?layers.markers.addTo(map):map.removeLayer(layers.markers);
 
-const PATROL_STORAGE_KEY='surakshyaPath.patrolPlan.v1';
-function savePatrolPlan(route,alloc,station,stops,officers){try{localStorage.setItem(PATROL_STORAGE_KEY,JSON.stringify({route,alloc,station,stops,officers}));}catch{}}
-function restorePatrolPlan(){try{const saved=JSON.parse(localStorage.getItem(PATROL_STORAGE_KEY)||'null');if(!saved?.route||!saved?.alloc)return;if(saved.station&&[...$('#p-station').options].some(o=>o.value===saved.station))$('#p-station').value=saved.station;if(saved.stops)$('#p-stops').value=saved.stops;if(saved.officers)$('#p-officers').value=saved.officers;drawRoute(saved.route,saved.alloc,false);}catch{localStorage.removeItem(PATROL_STORAGE_KEY);}}
+const PATROL_STORAGE_KEY='surakshyaPath.patrolPlan.v2';
+function patrolStorageKey(){return `${PATROL_STORAGE_KEY}:${encodeURIComponent(state.dataset?.id||'synthetic-dashboard-v1')}`;}
+function savePatrolPlan(route,alloc,station,stops,officers){
+  try{
+    localStorage.setItem(patrolStorageKey(),JSON.stringify({route,alloc,station,stops,officers}));
+    return true;
+  }catch(error){
+    console.warn('Generated patrol plan could not be saved in browser storage.',error);
+    return false;
+  }
+}
+function restorePatrolPlan(){
+  const key=patrolStorageKey();
+  try{
+    const saved=JSON.parse(localStorage.getItem(key)||'null');
+    if(!saved)return;
+    if(!saved.route?.station||!Array.isArray(saved.route.stops)||!Array.isArray(saved.alloc?.zones)){
+      localStorage.removeItem(key);
+      return;
+    }
+    if(saved.station&&[...$('#p-station').options].some(option=>option.value===saved.station))$('#p-station').value=saved.station;
+    if(saved.stops)$('#p-stops').value=saved.stops;
+    if(saved.officers)$('#p-officers').value=saved.officers;
+    drawRoute(saved.route,saved.alloc,false);
+  }catch(error){
+    console.warn('A saved patrol plan could not be restored.',error);
+    try{localStorage.removeItem(key);}
+    catch(cleanupError){console.warn('The invalid saved patrol plan could not be removed.',cleanupError);}
+  }
+}
 
 $('#p-generate').onclick=async()=>{
   const button=$('#p-generate');button.disabled=true;button.textContent='Generating…';
@@ -555,7 +707,8 @@ $('#p-generate').onclick=async()=>{
     const station=$('#p-station').value,stops=clamp(Number($('#p-stops').value)||5,1,10),officers=clamp(Number($('#p-officers').value)||12,2,40);
     const [route,alloc]=await Promise.all([getJSON(`${API}/patrol?station=${encodeURIComponent(station)}&stops=${stops}`),getJSON(`${API}/allocation?officers=${officers}`)]);
     $('#p-station').value=station;$('#p-stops').value=stops;$('#p-officers').value=officers;
-    savePatrolPlan(route,alloc,station,stops,officers);drawRoute(route,alloc);
+    const saved=savePatrolPlan(route,alloc,station,stops,officers);drawRoute(route,alloc,false);
+    toast(saved?'Patrol plan generated.':'Patrol plan generated, but could not be saved in this browser.',saved);
   }catch(err){toast(err.message||'Could not generate patrol plan.',false);}
   finally{button.disabled=false;button.textContent='Generate patrol plan';}
 };
@@ -587,10 +740,27 @@ function drawRoute(route,alloc,announce=true){
     const meta=await getJSON(`${API}/config`);
     state.types=meta.types||{};
     $('#p-station').innerHTML=(meta.stations||[]).map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
-    await refreshData();restorePatrolPlan();
+    await refreshData();
     const requestedTab=new URLSearchParams(location.search).get('tab');
-    const startTab=['overview','datasets','report','risk','patrol','analytics','research'].includes(requestedTab)?requestedTab:'overview';
-    setTab(startTab);setInterval(refreshData,60000);
+    const startTab=availableTab(requestedTab);
+    setTab(startTab,{pushHistory:false});
+    if(requestedTab&&requestedTab!==startTab){
+      const url=new URL(location.href);
+      url.searchParams.delete('tab');
+      history.replaceState(null,'',url);
+    }
+    window.addEventListener('popstate',()=>{
+      const requested=new URLSearchParams(location.search).get('tab');
+      const tab=availableTab(requested);
+      setTab(tab,{pushHistory:false});
+      if(requested&&requested!==tab){
+        const url=new URL(location.href);
+        url.searchParams.delete('tab');
+        history.replaceState(null,'',url);
+      }
+    });
+    const refreshTimer=setInterval(()=>{if(!document.hidden)refreshData();},60000);
+    window.addEventListener('pagehide',()=>clearInterval(refreshTimer),{once:true});
     window.addEventListener('resize',()=>{invalidateMapSize();drawHeat();if(state.tab==='analytics')requestAnimationFrame(()=>drawCharts(state.analytics));});
     document.addEventListener('visibilitychange',async()=>{if(!document.hidden)await refreshData();});
     $('#picked-spot').addEventListener('dblclick',useMyLocation);

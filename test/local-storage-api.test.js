@@ -48,6 +48,29 @@ test('local API persists reports atomically and preserves separate datasets', as
   const health = await healthResponse.json();
   assert.equal(health.operatingMode, 'local-research');
   assert.equal(health.mutationPolicy, 'local-research-only');
+  assert.equal(healthResponse.headers.get('cache-control'), 'no-store');
+  assert.match(healthResponse.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+
+  const crossOriginReport = await fetch(`${base}/incidents`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'https://untrusted.example'
+    },
+    body: JSON.stringify({ lat: 27.715, lng: 85.312, type: 'theft', when: 'now' })
+  });
+  assert.equal(crossOriginReport.status, 403);
+  assert.match((await crossOriginReport.json()).error, /Cross-origin/);
+
+  const sameOriginImport = await fetch(`${base}/dataset/import`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: new URL(base).origin
+    },
+    body: JSON.stringify({})
+  });
+  assert.equal(sameOriginImport.status, 400);
 
   const beforeReport = await fetch(`${base}/dashboard`);
   const initialDashboard = await beforeReport.json();

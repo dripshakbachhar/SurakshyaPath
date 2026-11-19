@@ -6,12 +6,17 @@
   <meta name="theme-color" content="#09243d" />
   <title>SurakshyaPath · A spatial research workspace</title>
   <meta name="description" content="A local-first research testbed for importing geographic data and studying how scoring models change spatial priorities." />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/images/surakshya-path-logo.png" type="image/png" />
+  <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/landing.css" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script defer src="js/cursor.js"></script>
   <script defer src="js/landing.js"></script>
+  <script defer src="js/pwa.js"></script>
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
   <div id="custom-cursor" class="custom-cursor" aria-hidden="true">
     <span class="cursor-ring"></span><span class="cursor-center"></span><span class="cursor-north"></span>
   </div>
@@ -27,7 +32,7 @@
     </nav>
   </header>
 
-  <main>
+  <main id="main-content" tabindex="-1">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
         <div class="eyebrow"><span class="eyebrow-dot"></span> A LOCAL-FIRST SPATIAL TESTBED</div>
@@ -37,10 +42,15 @@
           <a class="button button-primary" href="/workspace.html?tab=datasets">Explore a dataset <span aria-hidden="true">↗</span></a>
           <a class="button button-quiet" href="/workspace.html">Open the dashboard</a>
         </div>
-        <div class="hero-footnote"><span class="lock-mark" aria-hidden="true">◈</span> Imported files stay in this app’s local data store. No external analysis service.</div>
+        <div class="hero-footnote"><span class="lock-mark" aria-hidden="true">◈</span> Your browser parses the file; mapped records are sent to this app’s server. Public read-only mode disables imports, switching, and community-report writes.</div>
+        <p class="data-handling-note">In local research mode, mapped records are saved as JSON on the host until manually removed. Anyone with access to that host or app process may read them; files are not encrypted and there is no per-user isolation. Do not upload sensitive records.</p>
       </div>
 
-      <div class="hero-visual" aria-label="An animated three-dimensional route visualization">
+      <div class="hero-visual" role="img" aria-label="Decorative route visualization; a static illustration is shown when animation is unavailable.">
+        <svg class="route-scene-fallback" viewBox="0 0 360 260" aria-hidden="true">
+          <path d="M22 208 87 166 138 177 185 128 228 115 253 69 328 34" />
+          <circle cx="328" cy="34" r="7" />
+        </svg>
         <canvas id="route-scene" aria-hidden="true"></canvas>
         <div class="visual-label label-top"><span>FIELD NOTES / 01</span><i></i> SPATIAL SIGNAL</div>
         <div class="visual-label label-bottom"><span class="label-number">01</span><span>observe<br />then compare</span></div>
@@ -51,7 +61,7 @@
     </section>
 
     <section class="signal-strip" aria-label="Platform characteristics">
-      <div><span class="strip-number">01</span><b>Bring your own data</b><small>CSV or JSON · mapped locally</small></div>
+      <div><span class="strip-number">01</span><b>Bring your own data</b><small>CSV or JSON · mapped in your browser</small></div>
       <div><span class="strip-number">02</span><b>Keep methods visible</b><small>Scores, budgets, and routes</small></div>
       <div><span class="strip-number">03</span><b>Separate each study</b><small>Your dataset · its own analysis</small></div>
       <div class="strip-note"><span class="live-dot"></span> A research instrument — not a prediction product.</div>
@@ -66,7 +76,7 @@
         <article class="workflow-card">
           <div class="card-topline"><span>01</span><span class="card-symbol" aria-hidden="true">⌁</span></div>
           <h3>Bring in a dataset</h3>
-          <p>Map your own zone, category, location, and date fields. The file stays in the app’s separate dataset store.</p>
+          <p>Map your own zone, category, location, and date fields. Mapped records are sent to the app server and stored separately.</p>
           <a href="/workspace.html?tab=datasets">Start with a file <span aria-hidden="true">↗</span></a>
         </article>
         <article class="workflow-card workflow-featured">

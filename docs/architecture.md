@@ -50,6 +50,7 @@ New anonymous report
 - `server.js`: API composition and persistence boundary; it depends on the storage interface, not filesystem operations.
 - `storage/json-storage.js`: atomic local JSON adapter and read-only deployment adapter.
 - `public/js/app.js`: API consumer and presentation state.
+- `public/service-worker.js`: allowlisted static caching and offline navigation fallback; API requests always go to the server.
 
 Two operating modes are supported. Ordinary local development defaults to
 `local-research`; `SURAKSHYA_MODE=public-read-only` or a detected deployment
@@ -73,11 +74,20 @@ configuration and observed read/write outcomes; an adapter instance does not
 prove that a local filesystem is writable. Public deployments do not attempt
 project-directory writes.
 
+The browser UI is a static progressive web app. Its service worker may cache
+the landing page and selected same-origin assets, but never caches API
+responses, imported records, or community reports. The research workspace
+requires a network connection. Response headers include a content security
+policy; cross-origin API mutations are rejected when an `Origin` header is
+present. Neither control provides authentication.
+
 Imported files are parsed in the browser; mapped records are transmitted to
 the application server on import. Local imports remain in JSON storage until
 manually removed and have no automatic expiration. Anyone with host or
-application access can read them. Do not upload sensitive records to an
-unsecured deployment.
+application access can read them. Leaflet and Three.js are loaded from cdnjs;
+map tiles are requested from OpenStreetMap. Do not upload sensitive records to
+an unsecured deployment. See [docs/deployment.md](./deployment.md) for network
+and data-retention details.
 
 Other persisted outputs are separate from runtime state: the browser stores a
 generated patrol plan in `localStorage`, and explicitly run research/figure

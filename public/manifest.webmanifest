@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "SurakshyaPath Research Workspace",
+  "short_name": "SurakshyaPath",
+  "description": "An experimental workspace for reproducible spatial-prioritization research.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f5f1",
+  "theme_color": "#102c43",
+  "icons": [
+    {
+      "src": "/images/surakshya-path-logo.png",
+      "sizes": "768x768",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

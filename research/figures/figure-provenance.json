@@ -45,13 +45,13 @@
         "contentHash": {
           "algorithm": "sha256",
           "representation": "file-bytes",
-          "value": "00225caa2aa15b666dd3d4b396f92b4a0ffebbd6f8bbe8dfed017225b52edb78"
+          "value": "ba6df44eded5d0616f093fb845430c1318c8bdefdd06ec82e00964cf57e12176"
         }
       }
     ],
     "softwareVersion": "1.1.0",
     "commit": null,
-    "executedAt": "2026-11-19T07:36:05.853Z",
+    "executedAt": "2026-11-19T08:31:05.768Z",
     "metrics": {
       "topZoneConsistency": {
         "unit": "scenario replications"

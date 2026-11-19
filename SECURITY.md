@@ -86,6 +86,13 @@ headers are not trusted by Express unless separately configured; no proxy
 trust setting is enabled by this application. The local mode is not an
 internet-facing service.
 
+Responses include a Content Security Policy, frame protection, MIME
+sniffing protection, and a no-referrer policy. API responses are marked
+`Cache-Control: no-store`. When a browser sends an `Origin` header, API
+mutations require its host to match the request host. Requests without an
+`Origin` header are still accepted for local command-line clients; this is
+not authentication or authorization.
+
 ## Storage status and retention
 
 Health and dashboard responses distinguish configured storage from observed
@@ -106,6 +113,21 @@ local files or implement per-user access control.
 Public read-only mode does not accept or persist imports or community
 reports. Its static synthetic data and fixed research results are shared with
 all visitors.
+
+The browser parses source files locally, but mapped records are transmitted
+to the application server when submitted. The app does not send records to an
+external analysis service. The browser loads Leaflet, Leaflet.heat, and the
+landing-page Three.js visual from cdnjs; OpenStreetMap receives map-tile
+requests, including the visitor's network address and requested map area.
+There is no third-party analytics or advertising SDK.
+
+The service worker caches only a small allowlist of static same-origin files
+and the landing page. It does not cache `/api/` responses, imported records,
+or community reports. The research workspace requires a network connection;
+the offline page explains that current data was not cached.
+
+See [docs/deployment.md](./docs/deployment.md) for deployment configuration
+and the requirements for a future multi-user system.
 
 ## Reporting a security issue
 

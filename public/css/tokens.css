@@ -1,0 +1,46 @@
+:root {
+  --sp-ink: #102c43;
+  --sp-ink-soft: #315267;
+  --sp-muted: #526977;
+  --sp-paper: #f3f5f1;
+  --sp-surface: #fffefa;
+  --sp-surface-soft: #f7f8f4;
+  --sp-teal: #137b7c;
+  --sp-teal-strong: #0e666b;
+  --sp-teal-bright: #54b7ac;
+  --sp-amber: #e89a35;
+  --sp-line: rgba(15, 47, 68, .14);
+  --sp-shadow: 0 15px 40px rgba(20, 49, 67, .075);
+  --sp-focus: #8a4c00;
+  --sp-sans: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+}
+
+:focus-visible {
+  outline: 3px solid var(--sp-focus);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 10000;
+  top: 8px;
+  left: 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--sp-ink);
+  transform: translateY(calc(-100% - 12px));
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

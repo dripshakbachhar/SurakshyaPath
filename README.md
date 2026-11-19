@@ -1,6 +1,6 @@
 # 🛡️ SurakshyaPath · सुरक्षापथ
 
-**A reproducible research and engineering system for incident analysis, explainable risk modelling, patrol-route experimentation, and resource-allocation analysis.**
+**A reproducible research and engineering testbed for explainable spatial prioritization and downstream route/resource-allocation experiments.**
 
 > **Research safety note:** the current spatial dataset is synthetic. SurakshyaPath is an experimental system, not a crime-prediction product and not an operational policing recommendation engine.
 
@@ -53,7 +53,9 @@ Dashboard + reproducible experiments
 Browser
   └── public/
        ├── index.html
-       ├── css/style.css
+       ├── css/tokens.css
+       ├── css/landing.css
+       ├── css/workspace.css
        └── js/app.js
              │
              ▼
@@ -147,6 +149,10 @@ See:
 - `research/EXPERIMENT.md`
 - `research/RESULTS.md`
 
+See [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) for a concise system map and
+[docs/deployment.md](./docs/deployment.md) before exposing any instance to a
+network.
+
 ## Importing your data
 
 Open **Datasets** in the dashboard and import a CSV file with a header row or a
@@ -190,7 +196,18 @@ recognized deployment environments are read-only regardless of provider.
 Public mode keeps the canonical synthetic benchmark and fixed results
 available, but disables imports, switching, and community-report writes.
 Local JSON is best-effort filesystem persistence, not a managed production
-database.
+database. Public deployments must set `SURAKSHYA_MODE=public-read-only`
+regardless of provider; production and recognized hosting environments also
+default to read-only mode.
+
+The browser parses selected files locally. On import, mapped records are sent
+to the application server and saved as local JSON until manually removed.
+Anyone with host or application access can read them; files are not encrypted,
+and there is no per-user isolation. The service worker caches only selected
+static assets and never caches API responses or imported data. The app loads
+Leaflet/Three.js from cdnjs and map tiles from OpenStreetMap; those providers
+receive the browser's network request metadata. See [SECURITY.md](./SECURITY.md)
+and [docs/deployment.md](./docs/deployment.md) for details.
 
 ## Responsible-use boundaries
 

@@ -5,13 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Workspace · SurakshyaPath</title>
   <meta name="description" content="SurakshyaPath is an experimental dashboard for incident analysis, risk modelling, patrol routing and resource planning." />
+  <meta name="theme-color" content="#102c43" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/images/surakshya-path-logo.png" type="image/png" />
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+  <link rel="stylesheet" href="css/tokens.css" />
   <link rel="stylesheet" href="css/workspace.css" />
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to dashboard workspace</a>
   <div id="custom-cursor" class="custom-cursor" aria-hidden="true">
     <span class="cursor-ring"></span><span class="cursor-center"></span><span class="cursor-north"></span>
   </div>
@@ -43,17 +48,17 @@
   </div>
 
   <section class="stats-bar" aria-label="Live dashboard summary">
-    <button class="stat stat-click" data-stat="total"><span id="stat-total" class="num">—</span><span><b>Records</b><small>current dashboard</small></span></button>
-    <button class="stat stat-click" data-stat="zones"><span id="stat-zones" class="num">—</span><span><b>Active zones</b><small>with reports</small></span></button>
-    <button class="stat stat-click" data-stat="critical"><span id="stat-critical" class="num">—</span><span><b>High-risk zones</b><small>current risk model</small></span></button>
-    <button class="stat stat-click" data-stat="recent"><span id="stat-recent" class="num">—</span><span><b>Last 24 hours · UTC</b><small>records with supported timing</small></span></button>
+    <button type="button" class="stat stat-click" data-stat="total"><span id="stat-total" class="num">—</span><span><b>Records</b><small>current dashboard</small></span></button>
+    <button type="button" class="stat stat-click" data-stat="zones"><span id="stat-zones" class="num">—</span><span><b>Active zones</b><small>with reports</small></span></button>
+    <button type="button" class="stat stat-click" data-stat="critical"><span id="stat-critical" class="num">—</span><span><b>High-risk zones</b><small>current risk model</small></span></button>
+    <button type="button" class="stat stat-click" data-stat="recent"><span id="stat-recent" class="num">—</span><span><b>Last 24 hours · UTC</b><small>records with supported timing</small></span></button>
   </section>
 
   <div class="view-toggle-row">
     <button id="mobile-view-toggle" class="view-toggle" type="button" aria-controls="map-shell panel" aria-expanded="false">Show map</button>
   </div>
 
-  <main class="workspace">
+  <main id="main-content" class="workspace" tabindex="-1">
     <section id="map-shell" class="map-shell">
       <div id="map"></div>
       <div class="map-hud">
@@ -63,7 +68,7 @@
         </div>
         <button id="map-reset" class="icon-btn" type="button">Reset view</button>
       </div>
-      <div class="map-legend" aria-label="Map legend">
+      <div class="map-legend" role="group" aria-label="Map legend">
         <div class="map-legend-title">Map key</div>
         <span><i class="map-key zone-key"></i>Risk zone</span>
         <span><i class="map-key incident-key"></i>Incident</span>
@@ -103,13 +108,13 @@
         <p class="dashboard-note">This live view can include reports submitted through the app. Fixed synthetic experiment results are in <button type="button" class="inline-link" data-go="research">Research</button>.</p>
       </section>
 
-      <section id="panel-datasets" class="panel" role="tabpanel" aria-labelledby="tab-datasets">
-        <div class="panel-heading"><div><span class="eyebrow">Local data workspace</span><h2>Datasets</h2></div></div>
+      <section id="panel-datasets" class="panel" role="tabpanel" aria-labelledby="tab-datasets" aria-hidden="true" tabindex="-1" hidden>
+        <div class="panel-heading"><div><span class="eyebrow">Data workspace</span><h2>Datasets</h2></div></div>
         <p class="muted">CSV and JSON files are parsed in your browser. When you import, the mapped records—not the original file—are transmitted to this application server and saved as a separate imported dataset. They are not sent to an external analysis service.</p>
         <div id="dataset-current" class="active-dataset-card" role="status">Loading current dataset…</div>
         <div class="section-title">Import a dataset</div>
         <p class="dataset-help">Supported files are CSV with one header row or JSON containing a record array. Zone, category, latitude, and longitude are required; severity defaults to 1 and a record identifier is optional. Date/time may be omitted or unknown, but invalid and future values are rejected. ISO date-only values (YYYY-MM-DD) remain date-only; ISO date-times are exact (timezone-less date-times are interpreted as UTC); a closed start/end value is approximate. Unknown times and approximate ranges are excluded from severity × recency. Validation is all-or-nothing: every data row must pass, otherwise nothing is imported. Files and mapped JSON requests are each limited to 4 MiB; imports are limited to 50,000 rows, 100 zones, and 100 categories.</p>
-        <p class="research-caveat">Do not upload personally identifiable or sensitive incident records to an unsecured or publicly accessible deployment. Public deployments are read-only by default; local research mode is intended for one researcher on a trusted machine.</p>
+        <p class="research-caveat">Public deployments are read-only; local research mode is for one trusted researcher. Imported records persist as JSON on the host until manually removed and are visible to people with host or application access. The files are not encrypted and there is no per-user isolation. Do not upload personally identifiable or sensitive incident records.</p>
         <form id="dataset-form">
           <label for="dataset-name">Dataset name</label>
           <input id="dataset-name" type="text" maxlength="80" required placeholder="e.g. Community safety observations" />
@@ -137,7 +142,7 @@
         <p class="research-caveat">Importing changes the live dashboard only. The canonical 1,567-record synthetic research experiment and its saved results remain unchanged. The demo community-report form is disabled while an imported dataset is active.</p>
       </section>
 
-      <section id="panel-report" class="panel" role="tabpanel" aria-labelledby="tab-report">
+      <section id="panel-report" class="panel" role="tabpanel" aria-labelledby="tab-report" aria-hidden="true" tabindex="-1" hidden>
         <div class="panel-heading"><div><span class="eyebrow">Live dashboard tool</span><h2>Submit a report</h2></div></div>
         <p class="research-caveat">Reports are stored separately from synthetic benchmark records and update only the local demo dashboard. They are not added to the fixed research experiment or its stored results.</p>
         <p class="muted">Choose a point on the map, describe the incident, and submit it without an identity field.</p>
@@ -166,7 +171,7 @@
         <div class="privacy-card"><b>Privacy limitations</b><span>No name, phone number or login is collected by this interface. Local reports are saved in a JSON file on the host and may be visible to anyone with access to that machine or application. There is no automatic retention period, authentication, or per-user isolation. Do not submit sensitive details.</span></div>
       </section>
 
-      <section id="panel-research" class="panel" role="tabpanel" aria-labelledby="tab-research">
+      <section id="panel-research" class="panel" role="tabpanel" aria-labelledby="tab-research" aria-hidden="true" tabindex="-1" hidden>
         <div class="panel-heading"><div><span class="eyebrow">Separate research workspace</span><h2>Study and model comparison</h2></div></div>
         <p class="muted">A reproducible comparison of four explainable risk-scoring methods on the same deterministic synthetic dataset.</p>
         <div class="research-parameters">
@@ -216,7 +221,7 @@
         </details>
       </section>
 
-      <section id="panel-risk" class="panel" role="tabpanel" aria-labelledby="tab-risk">
+      <section id="panel-risk" class="panel" role="tabpanel" aria-labelledby="tab-risk" aria-hidden="true" tabindex="-1" hidden>
         <div class="panel-heading"><div><span class="eyebrow">Live exploratory view</span><h2>Zone map</h2></div></div>
         <p class="muted">This map shows the current dashboard snapshot using severity × recency. It is separate from the four-model comparison and is not a forecast or operational guide.</p>
         <div class="legend"><span><i class="dot low"></i>Low</span><span><i class="dot moderate"></i>Moderate</span><span><i class="dot high"></i>High</span><span><i class="dot critical"></i>Critical</span></div>
@@ -225,7 +230,7 @@
         <ul id="zone-list" class="zone-list"></ul>
       </section>
 
-      <section id="panel-patrol" class="panel" role="tabpanel" aria-labelledby="tab-patrol">
+      <section id="panel-patrol" class="panel" role="tabpanel" aria-labelledby="tab-patrol" aria-hidden="true" tabindex="-1" hidden>
         <div class="panel-heading"><div><span class="eyebrow">Interactive demonstration</span><h2>Allocation &amp; routes</h2></div></div>
         <p class="muted">Explore the live severity × recency model. The canonical four-model results use a fixed 12-officer budget and five stops; this control is separate and does not change those stored results.</p>
         <label for="p-station">Station</label><select id="p-station"></select>
@@ -236,12 +241,12 @@
         <div id="alloc-card" class="alloc-card hidden"></div>
       </section>
 
-      <section id="panel-analytics" class="panel" role="tabpanel" aria-labelledby="tab-analytics">
+      <section id="panel-analytics" class="panel" role="tabpanel" aria-labelledby="tab-analytics" aria-hidden="true" tabindex="-1" hidden>
         <div class="panel-heading"><div><span class="eyebrow">Exploratory view</span><h2>Time patterns</h2></div></div>
         <p class="muted">These charts describe the current dashboard snapshot in UTC and are not part of the four-model experiment. Synthetic and date-only records support day-level analysis only; unsupported metrics are shown as unavailable.</p>
-        <div class="chart-box"><div class="chart-title"><h3>Incidents by type</h3><span>Click a segment</span></div><div id="chart-type" class="chart" role="img" aria-label="Incidents by type"></div></div>
-        <div class="chart-box"><div class="chart-title"><h3>Event hour (exact timestamps only)</h3><span>UTC</span></div><div id="chart-hour" class="chart" role="img" aria-label="Exact event timestamps by UTC hour"></div></div>
-        <div class="chart-box"><div class="chart-title"><h3>Daily records (UTC)</h3><span>Last 30 calendar days · click a day</span></div><div id="chart-trend" class="chart" role="img" aria-label="Daily records over the last 30 UTC calendar days"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Incidents by type</h3><span>Click a segment</span></div><div id="chart-type" class="chart" role="group" aria-label="Incidents by type"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Event hour (exact timestamps only)</h3><span>UTC</span></div><div id="chart-hour" class="chart" role="group" aria-label="Exact event timestamps by UTC hour"></div></div>
+        <div class="chart-box"><div class="chart-title"><h3>Daily records (UTC)</h3><span>Last 30 calendar days · click a day</span></div><div id="chart-trend" class="chart" role="group" aria-label="Daily records over the last 30 UTC calendar days"></div></div>
       </section>
     </aside>
   </main>
@@ -257,12 +262,13 @@
     </section>
   </div>
 
-  <footer>SurakshyaPath · local dataset workspace · fixed synthetic research benchmark · research prototype</footer>
+  <footer>SurakshyaPath · dataset workspace · fixed synthetic research benchmark · research prototype</footer>
   <div id="toast" class="toast" aria-live="polite"></div>
   <script src="js/cursor.js"></script>
   <script src="js/temporal.js"></script>
   <script src="js/dataset-import.js"></script>
   <script src="js/import-limits.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/pwa.js"></script>
 </body>
 </html>

@@ -3,11 +3,16 @@
 (() => {
   const canvas = document.querySelector('#route-scene');
   const host = document.querySelector('.hero-visual');
-  if (!canvas || !host || !window.THREE) return;
+  if (!canvas || !host) return;
+  if (!window.THREE) {
+    canvas.hidden = true;
+    return;
+  }
 
   try {
     const THREE = window.THREE;
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    host.classList.add('webgl-ready');
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 
     const scene = new THREE.Scene();
@@ -116,6 +121,8 @@
     if (reducedMotion) renderer.render(scene, camera);
     else animate();
   } catch (error) {
+    host.classList.remove('webgl-ready');
+    canvas.hidden = true;
     console.warn('Three.js route visual is unavailable:', error);
   }
 })();

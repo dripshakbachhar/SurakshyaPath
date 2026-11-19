@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const ImportLimits = require('../public/js/import-limits');
+const vercelConfig = require('../vercel.json');
 
 const previousVercel = process.env.VERCEL;
 const previousDataDir = process.env.SURAKSHYA_DATA_DIR;
@@ -45,6 +46,27 @@ test('read-only deployment serves research data and rejects persistent writes', 
   assert.equal(health.storage.readable, false);
   assert.equal(health.storage.mode, 'read-only');
   assert.equal(health.storage.writable, false);
+  const vercelHeaders = vercelConfig.headers.find(rule => rule.source === '/(.*)').headers;
+  const configuredCsp = vercelHeaders.find(header => header.key === 'Content-Security-Policy').value;
+  assert.equal(healthResponse.headers.get('content-security-policy'), configuredCsp);
+  assert.equal(healthResponse.headers.get('cache-control'), 'no-store');
+
+  const workspacePage = await fetch(base.replace(/\/api$/, '') + '/workspace.html');
+  assert.equal(workspacePage.status, 200);
+  assert.match(workspacePage.headers.get('content-security-policy'), /object-src 'none'/);
+  assert.match(await workspacePage.text(), /manifest\.webmanifest/);
+
+  const offlinePage = await fetch(base.replace(/\/api$/, '') + '/offline.html');
+  assert.equal(offlinePage.status, 200);
+  assert.match(await offlinePage.text(), /does not cache API responses or imported data/);
+
+  const malformedJson = await fetch(`${base}/dataset/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{"name":'
+  });
+  assert.equal(malformedJson.status, 400);
+  assert.match(malformedJson.headers.get('content-security-policy'), /frame-ancestors 'none'/);
 
   const dashboardResponse = await fetch(`${base}/dashboard`);
   const dashboard = await dashboardResponse.json();
@@ -91,5 +113,6 @@ test('read-only deployment serves research data and rejects persistent writes', 
   });
   assert.equal(oversized.status, 413);
   assert.match((await oversized.json()).error, /4 MiB/);
+  assert.match(oversized.headers.get('content-security-policy'), /default-src 'self'/);
   assert.equal(fs.existsSync(storageRoot), false);
 });

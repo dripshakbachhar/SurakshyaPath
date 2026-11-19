@@ -2,7 +2,9 @@
 
 (() => {
   const cursor = document.querySelector('#custom-cursor');
-  if (!cursor || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  if (!cursor ||
+      !window.matchMedia('(hover: hover) and (pointer: fine)').matches ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   document.documentElement.classList.add('has-custom-cursor');
   let visible = false;
