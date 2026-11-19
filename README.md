@@ -155,14 +155,23 @@ defaults to 1. Zone labels from the file are retained, and the dashboard derives
 a centroid for each zone from its coordinates. Coordinates must use decimal
 latitude/longitude, and imported dates cannot be in the future.
 
-Imports are stored locally in separate files under `data/` and can be switched
-between the active dashboard and the synthetic demo. The Research workspace can
-run the same four scoring approaches, 12-unit allocation, and nearest-neighbour
-versus 2-opt distance comparison on the active import. A single import does not
-provide a multi-seed robustness estimate. Imports do not modify the canonical
-research dataset or its saved experiment results. Only use data you are
-authorized to process; imported data provenance is not independently verified
-by this prototype.
+The browser parses the source file; submitting an import transmits its mapped
+records to the application server. In local research mode, data is stored as
+local JSON files until manually removed and can be switched between the active
+dashboard and synthetic demo. There is no automatic expiration or per-user
+access control. Do not upload personally identifiable or sensitive records to
+an unsecured deployment. The Research workspace can run the same four scoring
+approaches, 12-unit allocation, and nearest-neighbour versus 2-opt distance
+comparison on the active import. Imports do not modify the canonical research
+dataset or its saved experiment results.
+
+Ordinary non-production local development defaults to `local-research`.
+`SURAKSHYA_MODE=public-read-only` selects the public mode; production and
+recognized deployment environments are read-only regardless of provider.
+Public mode keeps the canonical synthetic benchmark and fixed results
+available, but disables imports, switching, and community-report writes.
+Local JSON is best-effort filesystem persistence, not a managed production
+database.
 
 ## Responsible-use boundaries
 
@@ -243,4 +252,9 @@ The dashboard now exposes `/api/intelligence`, `/api/data-quality`, and `/api/di
 
 The end-to-end smoke test starts the real server, checks health, verifies seeded data and intelligence, creates a report, and confirms the new record propagates back into the dashboard/intelligence snapshot.
 
-The application is intentionally a local/research prototype. Local development persists runtime data as atomic JSON files. `vercel.json` and `api/index.js` provide a read-only deployment adapter: the synthetic dashboard and fixed research results remain available, while report submission, dataset import, and dataset switching return an explicit `503` until a durable external store is configured. Import requests are capped at 4 MiB to stay below [Vercel's 4.5 MB function request-body limit](https://vercel.com/docs/functions/limitations#request-body-size). The security controls documented in `SECURITY.md` are not a production deployment baseline.
+The application is intentionally a local/research prototype. Local JSON writes
+use atomic replacement but are not database transactions or guaranteed against
+machine/storage loss. Any public deployment requires a separately designed
+durable store and server-side access control before writes can be enabled.
+Import requests are capped at 4 MiB. The security controls documented in
+`SECURITY.md` are not a complete production deployment baseline.
