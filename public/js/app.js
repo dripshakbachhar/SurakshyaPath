@@ -151,7 +151,7 @@ function renderResearchSummary(summary){
   const severityRank=rankResults.find(result=>result.model==='severity-only');
   const severityAllocation=allocationResults.find(result=>result.model==='severity-only');
   const status=$('#research-results-status');
-  status.textContent=`Stored canonical results loaded · seed 208304 · frequency-only reference · ${rankResults.length} models`;
+  status.textContent=`Stored canonical results loaded · ${summary.sourceDataset?.id||'canonical-synthetic-benchmark-v1'} · seed 208304 · frequency-only reference · ${rankResults.length} models`;
   status.className='research-results-status';
   $('#research-highlight').textContent=`In the canonical scenario, severity-only re-ranked ${severityRank?.zones_with_rank_change??0} of 10 zones and changed the 12-officer allocation in ${severityAllocation?.zones_with_changed_allocation??0} zones.`;
   $('#research-highlight').hidden=false;
@@ -163,7 +163,7 @@ async function refreshData(){
   try{
     const dashboard=await getJSON(`${API}/dashboard`);
     const nextDataset=dashboard.dataset||{mode:'demo',name:'Synthetic dashboard demo',records:dashboard.incidents?.length||0};
-    const nextKey=`${nextDataset.mode}:${nextDataset.name}:${nextDataset.importedAt||''}`;
+    const nextKey=`${nextDataset.mode}:${nextDataset.id||nextDataset.name}:${nextDataset.importedAt||''}`;
     const datasetChanged=state.datasetKey!==nextKey;
     if(datasetChanged){
       state.datasetResearch=null;
@@ -234,7 +234,13 @@ function updateDatasetUI(){
   const dataset=state.dataset||{};
   const imported=dataset.mode==='imported';
   const storage=state.storage||{writable:true};
-  const readOnly=storage.writable===false;
+  const readOnly=storage.writable===false ||
+    (storage.operatingMode !== undefined && storage.operatingMode !== 'local-research');
+  const modeLabel=storage.operatingMode==='public-read-only'
+    ? 'Public read-only'
+    : storage.operatingMode==='unsupported'
+      ? 'Read-only · unsupported configuration'
+      : 'Local research · shared on this host';
   const reportDisabled=imported||readOnly;
   const reportTab=$('#tab-report');
   reportTab.disabled=reportDisabled;
@@ -243,7 +249,7 @@ function updateDatasetUI(){
   $('#report-storage-note').hidden=!readOnly;
   $('#report-storage-note').textContent=readOnly?(storage.reason||'Community reporting is disabled because persistent storage is unavailable.'):'';
   $('.dashboard-action[data-go="report"]').classList.toggle('hidden',reportDisabled);
-  $('#dataset-current').innerHTML=`<span>Active dashboard dataset</span><b>${esc(dataset.name||'Synthetic dashboard demo')}</b><small>${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones · ${imported?'Imported data':'Synthetic demo'}</small>${readOnly?`<small>Read-only deployment: ${esc(storage.reason||'persistent storage is unavailable.')}</small>`:''}`;
+  $('#dataset-current').innerHTML=`<span>Active dashboard dataset</span><b>${esc(dataset.name||'Synthetic dashboard demo')}</b><small>${Number(dataset.records||0).toLocaleString()} records · ${dataset.zones||0} zones · ${imported?'Imported data':'Synthetic demo'} · ${esc(dataset.id||'synthetic-dashboard-v1')}</small><small>Mode: ${esc(modeLabel)}</small>${readOnly?`<small>Read-only mode: ${esc(storage.reason||'persistent writes are disabled.')}</small>`:''}`;
   $('#use-demo-data').classList.toggle('hidden',!imported);
   $('#use-saved-import').classList.toggle('hidden',imported||!dataset.hasImportedDataset);
   $('#use-demo-data').disabled=readOnly;
@@ -273,7 +279,7 @@ function renderDatasetResearch(result){
   };
   $('#dataset-research-results').innerHTML=result.rows.map(row=>{const available=row.availability!=='UNAVAILABLE';const label=`${labels[row.model]||row.model}${row.availability==='PARTIAL'?' · partial':''}`;return `<tr><th scope="row">${esc(label)}</th><td>${available?esc(row.topZone):'Unavailable'}</td><td>${available?`${row.zonesReRanked} / ${row.zoneCount}`:'—'}</td><td>${available?`${row.allocationChanges} / ${row.zoneCount}`:'—'}</td><td>${available?`${Number(row.nearestNeighbourKm).toFixed(2)} km`:'—'}</td><td>${available?`${Number(row.twoOptKm).toFixed(2)} km`:'—'}</td></tr>`;}).join('');
   const coverage=result.dataset.temporalCoverage;
-  $('#dataset-research-summary').textContent=`Computed from ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories. The severity × recency model used ${coverage.recencyEligibleRecords} records; ${coverage.recencyExcludedRecords} with unknown or future timing were excluded. These results do not replace or modify the canonical synthetic experiment.`;
+  $('#dataset-research-summary').textContent=`Source ${result.dataset.id} · ${Number(result.dataset.records).toLocaleString()} imported records across ${result.dataset.zones} zones and ${result.dataset.categories.length} categories. The severity × recency model used ${coverage.recencyEligibleRecords} records; ${coverage.recencyExcludedRecords} with unknown or future timing were excluded. These results do not replace or modify the canonical synthetic experiment.`;
   $('#dataset-research-summary').hidden=false;
   $('#dataset-research-methods').textContent=`${result.methods.scoring} ${result.methods.allocation} ${result.methods.routing} ${result.methods.robustness}`;
   $('#dataset-research-methods').classList.remove('hidden');
@@ -311,7 +317,7 @@ function importMapping(){
 }
 function validateImportDraft(){
   const status=$('#dataset-import-status'),button=$('#dataset-import-button');
-  if(state.storage?.writable===false){
+  if(state.storage?.writable===false || (state.storage?.operatingMode !== undefined && state.storage.operatingMode !== 'local-research')){
     status.textContent=state.storage.reason||'Dataset imports are disabled because persistent storage is unavailable.';
     status.className='dataset-import-status error';
     button.disabled=true;
@@ -385,7 +391,7 @@ IMPORT_FIELDS.forEach(field=>$(`#${field.id}`).addEventListener('change',validat
 $('#dataset-name').addEventListener('input',validateImportDraft);
 $('#dataset-form').addEventListener('submit',async event=>{
   event.preventDefault();
-  if(!state.importDraft||state.storage?.writable===false)return;
+  if(!state.importDraft||state.storage?.writable===false || (state.storage?.operatingMode !== undefined && state.storage.operatingMode !== 'local-research'))return;
   const button=$('#dataset-import-button');
   button.disabled=true;button.textContent='Importing…';
   try{
@@ -426,7 +432,11 @@ $('#use-demo-data').addEventListener('click',async()=>{
 $('#use-saved-import').addEventListener('click',async()=>{
   const button=$('#use-saved-import');button.disabled=true;
   try{
-    await getJSON(`${API}/dataset/use-imported`,{method:'POST'});
+    await getJSON(`${API}/dataset/use-imported`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({datasetId:state.dataset?.importedDatasetId})
+    });
     await refreshData();
     toast('Saved imported dataset restored.');
   }catch(error){toast(error.message||'Could not restore the imported dataset.',false);}
