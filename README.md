@@ -1,296 +1,140 @@
-# 🛡️ SurakshyaPath · सुरक्षापथ
+# SurakshyaPath · सुरक्षापथ
 
-**A reproducible research and engineering testbed for explainable spatial prioritization and downstream route/resource-allocation experiments.**
+**An experimental research platform for exploring how spatial-prioritization models influence route and resource-allocation experiments.**
 
-> **Research safety note:** the current spatial dataset is synthetic. SurakshyaPath is an experimental system, not a crime-prediction product and not an operational policing recommendation engine.
+<p align="center">
+  <a href="YOUR_VERIFIED_VERCEL_URL">Live Application</a> ·
+  <a href="https://github.com/dripshakbachhar/SurakshyaPath">Source Code</a> ·
+  <a href="./PROJECT_OVERVIEW.md">Project Overview</a>
+</p>
 
-## Why this project exists
+---
 
-SurakshyaPath studies a practical systems question:
+## About
 
-> **How do different, explainable risk-scoring assumptions change geographic prioritization and downstream routing/resource-allocation outputs when evaluated on the same deterministic synthetic dataset?**
+SurakshyaPath is a research and engineering platform for investigating how different scoring assumptions affect geographic priorities and subsequent computational experiments.
 
-The project intentionally makes modelling assumptions visible and compares multiple approaches instead of treating a single formula as ground truth.
+It combines dataset management, spatial visualization, explainable scoring models, route comparisons, and resource-allocation experiments in one workspace.
 
-## System pipeline
-
-```
-Synthetic or imported incident data
-        ↓
-Validation + spatial assignment
-        ↓
-Risk models
-        ↓
-Geographic prioritization
-     ↙       ↘
-Patrol routing   Resource allocation
-        ↓
-Dashboard + reproducible experiments
-```
+The objective is to make modelling choices transparent and their computational effects reproducible.
 
 ## Features
 
-- 🗺️ Leaflet-based incident and risk-map dashboard
-- 📂 Local CSV/JSON import with field mapping, validation, zone-aware analysis, and saved dataset switching
-- 📝 Anonymous local incident-reporting workflow
-- 📊 30-day risk scoring using severity × recency
-- 🧪 Frequency, severity, frequency×severity, and severity×recency research models
-- 🔬 On-demand four-model comparisons for imported datasets, with fixed-budget allocation and nearest-neighbour/2-opt route-distance comparisons
-- 🚔 Nearest-neighbour patrol routing with route-sensitivity experiments
-- 👮 Largest-remainder proportional allocation experiments
-- 📈 Timing, frequency, and trend analytics
-- 🧠 Explainable intelligence layer connected to the same canonical dataset and live risk model
-- 🔎 Diagnostics endpoints for data, pipeline, model, and storage visibility
-- 🔁 Deterministic synthetic-data generation
-- ✅ Node.js unit tests + deterministic validation
-- 🤖 GitHub Actions CI for code and research reproducibility
-- 🔐 Basic API hardening, security headers, payload limits, input validation, and rate limiting
-- 💻 One-command local hosting
+- **Dataset management:** Import and validate CSV/JSON datasets.
+- **Spatial visualization:** Explore geographic records and zone-level patterns.
+- **Model comparison:** Compare four explainable scoring approaches.
+- **Route experiments:** Evaluate nearest-neighbour and 2-opt route distances.
+- **Resource allocation:** Compare allocations under different budgets.
+- **Research workspace:** Run reproducible experiments and inspect results.
+- **Analytics:** Examine distributions, temporal patterns, and data quality.
 
-## Architecture
+## Research benchmark
 
-```
-Browser
-  └── public/
-       ├── index.html
-       ├── css/tokens.css
-       ├── css/landing.css
-       ├── css/workspace.css
-       └── js/app.js
-             │
-             ▼
-        Express API
-          server.js
-             │
-       ┌─────┼───────────────┐
-       ▼     ▼               ▼
-     risk  routing       allocation
-       │     │               │
-       └─────┼───────────────┘
-             ▼
-          config/
-          data/
-          experiments/
-          research/
-```
+| Component | Current setup |
+|---|---:|
+| Synthetic records | 1,567 |
+| Geographic zones | 10 |
+| Scoring models | 4 |
+| Robustness scenarios | 5 |
 
-Core algorithms are intentionally small and independently testable.
+The benchmark uses deterministic synthetic data. Generated locations are not actual police incident coordinates. Results demonstrate algorithmic behaviour under specified assumptions, not real-world crime patterns or operational effectiveness.
 
-## Quick start
+See [Data Sources](./data/data_sources.md) and [Research Limitations](./research/LIMITATIONS.md).
 
-Requires **Node.js 18+**.
+## Technology
+
+- **Backend:** Node.js, Express
+- **Frontend:** HTML, CSS, JavaScript
+- **Mapping:** Leaflet, Leaflet.heat
+- **Visualization:** Three.js
+- **Deployment:** Vercel
+- **Testing:** Node.js test runner, GitHub Actions
+
+## Installation and local setup
+
+**Requirements:** Node.js 18+ and npm.
+
+Clone the repository:
 
 ```bash
-npm install
+git clone https://github.com/dripshakbachhar/SurakshyaPath.git
+```
+
+Navigate into the project:
+
+```bash
+cd SurakshyaPath
+```
+
+Install dependencies:
+
+```bash
+npm ci
+```
+
+Start the application:
+
+```bash
 npm run local
 ```
 
-Open **http://localhost:3000**.
+**Open the application in your browser:**
 
-Alternative commands:
-
-```bash
-npm start          # production-style local start
-npm run dev        # Node watch mode
-PORT=4000 npm run local
+```text
+http://localhost:3000
 ```
 
-## Quality checks
+The default local development port is `3000`.
 
-Run the same checks used by CI:
+## Validation
+
+Run the project's main validation and research commands:
 
 ```bash
 npm test
 npm run validate
+npm run smoke
 npm run research
 npm run figures
-npm run smoke
 ```
 
-Research experiment commands:
+## Deployment and data
 
-```bash
-npm run research-experiments
-npm run patrol-experiments
-npm run allocation-experiments
-npm run robustness-experiments
-```
+Public Vercel deployments operate in **read-only mode**. Dataset imports, dataset switching, and community-report writes are disabled.
 
-Generated research outputs are stored under `experiments/results/`.
+Local research mode supports imports and JSON persistence but is intended for a single researcher on a trusted machine. It does not provide per-user isolation or managed database storage.
 
-## Research design
+Do not upload sensitive or personally identifiable information to an unsecured deployment.
 
-The baseline risk model is:
+See [Deployment Guide](./docs/deployment.md) and [Security Policy](./SECURITY.md).
 
-```
-risk(zone) = Σ severity(incident) × recency_decay(incident)
-```
+## Documentation
 
-The current recency function gives newer records more weight and applies a minimum weight of 0.15 within the 30-day modelling window. Future-dated records are excluded from risk snapshots.
+- [Project Overview](./PROJECT_OVERVIEW.md)
+- [Architecture](./docs/architecture.md)
+- [Data Sources](./data/data_sources.md)
+- [Experimental Design](./research/EXPERIMENT.md)
+- [Research Results](./research/RESULTS.md)
+- [Research Limitations](./research/LIMITATIONS.md)
+- [Contributing Guidelines](./CONTRIBUTING.md)
 
-The research suite compares:
+## License and attribution
 
-1. **frequency-only**
-2. **severity-only**
-3. **frequency × severity**
-4. **severity × recency**
+The project intends to use the **MIT License**. A root-level `LICENSE` file must be added to complete this licensing setup.
 
-The purpose is sensitivity analysis: measuring how explicit modelling choices propagate into rankings, route order, and mathematical allocations.
+Third-party components retain their respective licenses:
 
-## Data provenance
+- [Express — MIT](https://github.com/expressjs/express)
+- [Three.js — MIT](https://github.com/mrdoob/three.js)
+- [Leaflet — BSD-2-Clause](https://github.com/Leaflet/Leaflet)
+- [Leaflet.heat — BSD-2-Clause](https://github.com/Leaflet/Leaflet.heat)
+- [Vercel Speed Insights — Apache-2.0](https://github.com/vercel/speed-insights)
+- [OpenStreetMap — ODbL and tile usage policy](https://www.openstreetmap.org/copyright)
 
-The repository currently contains **1,567 synthetic spatial records** representing a Shrawan 2083 experimental scenario. The dashboard now consumes these same canonical records instead of maintaining a separate 180-record demo seed. Aggregate official statistics are treated as contextual reference data, not as geocoded incident records.
+See the dependency lockfile for additional package licenses.
 
-See:
+---
 
-- `data/data_sources.md`
-- `data/README.md`
-- `research/LIMITATIONS.md`
-- `research/EXPERIMENT.md`
-- `research/RESULTS.md`
+**SurakshyaPath · सुरक्षापथ**
 
-See [PROJECT_OVERVIEW.md](./PROJECT_OVERVIEW.md) for a concise system map and
-[docs/deployment.md](./docs/deployment.md) before exposing any instance to a
-network.
-
-## Importing your data
-
-Open **Datasets** in the dashboard and import a CSV file with a header row or a
-JSON record array (or an object with a `records` array). Map columns for zone,
-category, latitude, and longitude; date/time and source identifier are optional.
-Severity is optional and defaults to 1. Zone labels from the file are retained,
-and the dashboard derives a centroid for each zone from its coordinates.
-Coordinates must be decimal latitude/longitude, severity must be from 0 to 10,
-and invalid or future timestamps are rejected. Date-only values remain
-date-only, timezone-less date-times are interpreted as UTC, and closed
-`start/end` intervals remain approximate ranges. Blank or recognized unknown
-date values remain unknown; unknown times and approximate ranges are excluded
-from severity × recency analysis.
-
-Validation is all-or-nothing. Every record must pass, otherwise no records are
-imported; the interface reports accepted/rejected counts and generic reasons
-without echoing raw records. Blank CSV lines are counted and skipped. Imports
-are limited to 4 MiB for both source and mapped request, 50,000 records, 100
-zones, and 100 categories. Malformed CSV structure, duplicate/empty headers,
-inconsistent row widths, duplicate mapped identifiers, invalid coordinates,
-and invalid field values block the whole import.
-
-The browser parses the source file; submitting an import transmits its mapped
-records to the application server. In local research mode, data is stored as
-local JSON files until manually removed and can be switched between the active
-dashboard and synthetic demo. A successful new import replaces the single
-saved imported dataset; switching modes does not delete it. Its provenance
-includes the sanitized source filename and format, selected column mapping,
-validation and temporal-precision summaries, import time, schema version, and
-a SHA-256 hash of normalized records. There is no automatic expiration or
-per-user access control. Do not upload personally identifiable or sensitive
-records to an unsecured deployment. The Research workspace can run the same
-four scoring approaches, 12-unit allocation, and nearest-neighbour versus
-2-opt distance comparison on the active import. Responses identify the source
-dataset, coverage, exclusions, warnings, and model configuration. Imports do
-not modify the canonical research dataset or its saved experiment results.
-
-Ordinary non-production local development defaults to `local-research`.
-`SURAKSHYA_MODE=public-read-only` selects the public mode; production and
-recognized deployment environments are read-only regardless of provider.
-Public mode keeps the canonical synthetic benchmark and fixed results
-available, but disables imports, switching, and community-report writes.
-Local JSON is best-effort filesystem persistence, not a managed production
-database. Public deployments must set `SURAKSHYA_MODE=public-read-only`
-regardless of provider; production and recognized hosting environments also
-default to read-only mode.
-
-The browser parses selected files locally. On import, mapped records are sent
-to the application server and saved as local JSON until manually removed.
-Anyone with host or application access can read them; files are not encrypted,
-and there is no per-user isolation. The service worker caches only selected
-static assets and never caches API responses or imported data. The app loads
-Leaflet/Three.js from cdnjs and map tiles from OpenStreetMap; those providers
-receive the browser's network request metadata. See [SECURITY.md](./SECURITY.md)
-and [docs/deployment.md](./docs/deployment.md) for details.
-
-## Responsible-use boundaries
-
-This project deliberately does **not** claim to:
-
-- predict individual crime events;
-- represent real incident-level police records;
-- produce operational patrol recommendations;
-- provide validated staffing recommendations;
-- infer causality from synthetic data;
-- establish that one risk model is objectively superior.
-
-The patrol experiments use great-circle coordinate distance, not road-network travel time. Resource allocation is an algorithmic experiment. Any real deployment would require validated data, domain expertise, legal/ethical review, security controls, auditability, and meaningful human oversight.
-
-**Reproducibility does not imply real-world validity.**
-
-## Engineering practices
-
-- Shared live incident taxonomy in `config/incident-types.js`
-- Research-only severity assumptions remain isolated in `config/severity.js`
-- Core algorithm tests use Node's built-in test runner
-- API input is validated at the boundary
-- JSON request bodies are size-limited
-- Security response headers are applied centrally
-- API 404s and unexpected errors return controlled JSON responses
-- Rate-limit state is bounded in memory
-- Malformed JSON receives a controlled 400 response
-- Failed incident persistence is reported instead of returning a false success
-- Zero-score allocation inputs use a deterministic equal-share fallback
-- Server shutdown is graceful
-- Local runtime data remains ignored by Git
-- CI runs tests, validation, end-to-end smoke checks, research generation, and figure generation
-- Dashboard, risk, analytics, intelligence, patrol, and allocation consume the same incident snapshot
-
-## Project status
-
-- [x] Working dashboard
-- [x] Explainable baseline risk model
-- [x] Alternative model experiments
-- [x] Patrol-route sensitivity experiment
-- [x] Resource-allocation sensitivity experiment
-- [x] Robustness experiments
-- [x] Deterministic validation
-- [x] Reproducible research figures
-- [x] Automated unit tests
-- [x] CI quality pipeline
-- [x] Local hosting command
-- [x] Engineering/security documentation
-- [ ] Production deployment hardening
-- [ ] Road-network routing integration
-- [ ] External peer review of modelling assumptions
-
-## License
-
-MIT
-
-
-## Local deployment and smoke check
-
-For a local development run:
-
-```bash
-npm ci
-npm run local
-```
-
-Then verify the service responds:
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-For a non-default port, use `PORT=4000 npm run local`.
-
-### Intelligence and diagnostics
-
-The dashboard now exposes `/api/intelligence`, `/api/data-quality`, and `/api/diagnostics`. The intelligence layer is deliberately classified as `STATISTICAL_HEURISTIC`, not a trained neural network. It consumes the canonical 1,567-record synthetic dataset, passes records through the data-quality gate, and receives the same risk-zone output used by the dashboard. It combines validated observations, temporal comparisons, and zone/type frequency into an explainable contract with explicit `NO_DATA`, `INSUFFICIENT_DATA`, `PARTIAL_SUCCESS`, and `SUCCESS` states.
-
-The end-to-end smoke test starts the real server, checks health, verifies seeded data and intelligence, creates a report, and confirms the new record propagates back into the dashboard/intelligence snapshot.
-
-The application is intentionally a local/research prototype. Local JSON writes
-use atomic replacement but are not database transactions or guaranteed against
-machine/storage loss. Any public deployment requires a separately designed
-durable store and server-side access control before writes can be enabled.
-Import requests are capped at 4 MiB. The security controls documented in
-`SECURITY.md` are not a complete production deployment baseline.
+*Explore the assumptions. Compare the outcomes. Reproduce the experiment.*
