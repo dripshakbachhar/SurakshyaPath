@@ -1,18 +1,3 @@
-<div align="center">
-
-![SurakshyaPath](assets/visuals/github-readme-hero.png)
-
-# SurakshyaPath
-
-### An explainable spatial-prioritization research platform
-
-</div>
-
----
-
-## Research overview
-
-![Research workflow](assets/visuals/graphical-abstract.png)
 # SurakshyaPath · सुरक्षापथ
 
 **An experimental research platform for exploring how spatial-prioritization models influence route and resource-allocation experiments.**
